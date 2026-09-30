@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chem-agent"
+version = "0.1.0"
+description = "Chemical knowledge retrieval and bounded tool-calling prototype"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "smolagents[openai]==1.26.0",
+  "scikit-learn>=1.5,<2",
+  "pydantic>=2.9,<3",
+  "pint>=0.24,<1",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+ui = ["gradio>=5,<6"]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+chem-agent = "chem_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
