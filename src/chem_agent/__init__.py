@@ -1,3 +1,3 @@
-"""Chemical knowledge-example and tool-calling prototype."""
+"""化工知识检索与可追溯工具调用。"""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

@@ -1,23 +1,7 @@
 [
-  {
-    "id": "A",
-    "mode": "ask",
-    "question": "定压比热与热负荷有什么关系？简化计算需要哪些条件？请给出检索来源。",
-    "expected": {"checks": ["实际检索", "公式与变量", "单相恒比热无相变忽略热损失", "引用本次片段"]},
-    "evidence_status": "theoretical_expectation_not_executed"
-  },
-  {
-    "id": "B",
-    "mode": "task",
-    "question": "请先检索单相显热公式。某液体质量流量1000 kg/h，从25摄氏度加热到65摄氏度，给定比热4.18 kJ/(kg*K)。假设单相、恒比热、无相变、忽略热损失。请先换算为kg/s，再让热负荷工具引用换算结果，计算kW热负荷并说明来源和条件。",
-    "expected": {"mass_flow_kg_s": 0.2777777777777778, "delta_t_k": 40, "heat_duty_kw": 46.44444444444444},
-    "evidence_status": "theoretical_expectation_not_executed"
-  },
-  {
-    "id": "C",
-    "mode": "task",
-    "question": "稳态、无反应、无积累条件下，100 kg/h且盐质量分数5%的盐水与400 kg/h纯水混合。请检索依据，使用质量分数口径计算出口总流量和盐质量分数。",
-    "expected": {"total_mass_flow_kg_h": 500, "component_mass_flow_kg_h": 5, "mass_fraction": 0.01},
-    "evidence_status": "theoretical_expectation_not_executed"
-  }
+  {"id":"knowledge","label":"知识问答","question":"定压比热与热负荷有什么关系？简化显热计算需要哪些条件？"},
+  {"id":"heat","label":"热负荷计算","question":"某液体质量流量为1000 kg/h，从25℃加热到65℃，给定比热4.18 kJ/(kg·K)。假设单相、恒比热、无相变且忽略热损失，请检索依据并计算热负荷，结果用kW表示。"},
+  {"id":"balance","label":"混合衡算","question":"稳态、无反应、无积累条件下，100 kg/h、盐质量分数5%的溶液与400 kg/h纯水混合。请检索依据，求总出口流量和盐质量分数。"},
+  {"id":"units","label":"单位换算","question":"请将2.5 MPa换算成kPa。"},
+  {"id":"missing","label":"缺少参数","question":"某液体1000 kg/h，从25℃加热到65℃，请计算热负荷。"}
 ]

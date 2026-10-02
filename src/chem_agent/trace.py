@@ -1,49 +1,81 @@
-"""Append-only events and final manifest for one run. Credentials are redacted."""
-from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+"""Persist observable plans and executions, excluding private model reasoning."""
+
+from __future__ import annotations
+
 import json
+import math
+import re
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
+from typing import Any
 
 
-def serializable(value):
-    if hasattr(value, "model_dump"):
-        return value.model_dump()
-    if hasattr(value, "to_dict"):
-        return value.to_dict()
-    if is_dataclass(value):
-        return asdict(value)
-    if isinstance(value, Path):
-        return str(value)
-    return str(value)
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def redact(text: str, secrets: tuple[str, ...]) -> str:
-    for secret in secrets:
-        if secret:
-            text = text.replace(secret, "[REDACTED]")
-    return text
+def redact(value: Any, secrets: tuple[str, ...] = ()) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        return f"[invalid non-finite number: {value}]"
+    if isinstance(value, dict):
+        return {
+            str(k): "[redacted]"
+            if any(word in str(k).lower() for word in ("api_key", "authorization", "password"))
+            else redact(v, secrets)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [redact(v, secrets) for v in value]
+    if isinstance(value, str):
+        for secret in secrets:
+            if secret:
+                value = value.replace(secret, "[redacted]")
+        return re.sub(r"\bsk-[A-Za-z0-9_-]{10,}", "[redacted]", value)
+    return value
 
 
 class RunTrace:
-    def __init__(self, runs_dir: Path, secrets: tuple[str, ...] = ()):
-        self.run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
-        self.directory = runs_dir / self.run_id
-        self.directory.mkdir(parents=True, exist_ok=False)
-        self.secrets = tuple(s for s in secrets if s)
+    def __init__(self, directory: Path, question: str, config: dict, version: str, secrets=()):
+        self.directory = directory
+        self.secrets = tuple(secrets)
+        self.run_id = (
+            datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:10]
+        )
+        self.path = directory / f"{self.run_id}.json"
+        self.data = {
+            "schema_version": 1,
+            "run_id": self.run_id,
+            "mode": "live",
+            "started_at": utc_now(),
+            "question": question,
+            "config": config,
+            "knowledge_version": version,
+            "status": "running",
+            "plan": [],
+            "calls": [],
+            "evidence": [],
+            "model_requests": [],
+            "answer": "",
+            "citations": [],
+        }
+        self.save()
 
-    def encode(self, value) -> str:
-        content = json.dumps(value, ensure_ascii=False, default=serializable, allow_nan=False)
-        for secret in self.secrets:
-            content = content.replace(json.dumps(secret, ensure_ascii=False)[1:-1], "[REDACTED]")
-        return content
+    def save(self) -> None:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        cleaned = redact(self.data, self.secrets)
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(cleaned, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8"
+        )
+        temporary.chmod(0o600)
+        temporary.replace(self.path)
 
-    def event(self, event: str, **payload) -> None:
-        row = {"run_id": self.run_id, "time": datetime.now(timezone.utc).isoformat(),
-               "event": event, **payload}
-        with (self.directory / "events.jsonl").open("a", encoding="utf-8") as stream:
-            stream.write(self.encode(row) + "\n")
+    def finish(self, status: str, answer: str, citations: list[str] | None = None) -> None:
+        self.data.update(
+            status=status, answer=answer, citations=citations or [], finished_at=utc_now()
+        )
+        self.save()
 
-    def finish(self, **payload) -> None:
-        (self.directory / "result.json").write_text(
-            self.encode({"run_id": self.run_id, **payload}), encoding="utf-8")
+    def result(self) -> dict:
+        return {**redact(self.data, self.secrets), "trace_path": str(self.path)}

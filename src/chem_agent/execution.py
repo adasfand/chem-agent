@@ -1,126 +1,218 @@
-"""Thin domain guard around framework calls; no custom Agent execution loop."""
-from copy import deepcopy
+"""Validated execution and explicit references to earlier results."""
+
+from __future__ import annotations
+
+import inspect
 import re
+from copy import deepcopy
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .tools import FUNCTIONS, SCHEMAS, ureg
+from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
+from chem_agent.knowledge import KnowledgeBase
+from chem_agent.trace import RunTrace, utc_now
+
+TOOL_NAMES = {"search_knowledge", "convert_units", "calc_heat_duty", "calc_mass_balance"}
 
 
 class PlanStep(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    step_id: str = Field(pattern=r"^s[1-9][0-9]*$")
-    goal: str = Field(min_length=1)
-    tool_name: str
-    depends_on: list[str] = Field(default_factory=list)
-    input_refs: dict[str, str]
+    model_config = ConfigDict(extra="forbid", strict=True)
+    step_id: str = Field(pattern=r"^s[1-9][0-9]?$", max_length=3)
+    goal: str = Field(min_length=1, max_length=200)
+    tool_name: Literal["search_knowledge", "convert_units", "calc_heat_duty", "calc_mass_balance"]
+    depends_on: list[str] = Field(default_factory=list, max_length=6)
 
 
-class ExecutionContext:
-    def __init__(self, trace, index, settings, mode="task"):
-        self.trace, self.index, self.settings, self.mode = trace, index, settings, mode
-        self.plan: dict[str, PlanStep] = {}
-        self.outputs: dict[str, dict] = {}
-        self.status: dict[str, str] = {}
-        self.citations: dict[str, dict] = {}
-        self.plan_version = 0
+class Execution:
+    def __init__(self, knowledge: KnowledgeBase, trace: RunTrace):
+        self.knowledge = knowledge
+        self.trace = trace
+        self.results: dict[str, dict] = {}
+        self.functions = {
+            "search_knowledge": knowledge.search,
+            "convert_units": convert_units,
+            "calc_heat_duty": calc_heat_duty,
+            "calc_mass_balance": calc_mass_balance,
+        }
 
-    def record_plan(self, steps: list[dict]) -> dict:
-        if not steps or len(steps) > self.settings.max_steps:
-            raise ValueError("计划不能为空或超过步数上限")
-        parsed = [PlanStep.model_validate(s) for s in steps]
+    def set_plan(self, steps: list[dict]) -> dict:
+        if self.trace.data["status"] != "running":
+            raise ValueError("任务已经结束。")
+        if self.trace.data["plan"]:
+            raise ValueError("本次任务已建立计划；请按现有步骤执行或说明阻塞原因。")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
+            raise ValueError("计划需要包含 1–6 个步骤。")
+        parsed = [PlanStep.model_validate(step) for step in steps]
         seen = set()
         for step in parsed:
-            if step.step_id in seen or any(dep not in seen for dep in step.depends_on):
-                raise ValueError("步骤ID重复、前向依赖或循环依赖；请按执行顺序提交")
-            if step.tool_name not in SCHEMAS or (self.mode == "ask" and step.tool_name != "search_knowledge"):
-                raise ValueError("此模式不允许该工具")
-            for ref in step.input_refs.values():
-                if ref.startswith("user:") and ref[5:].strip():
-                    continue
-                upstream, separator, field = ref.partition(".")
-                if not separator or not field or upstream not in step.depends_on:
-                    raise ValueError("input_refs 必须为 user:输入依据 或依赖步骤.返回字段")
+            if step.step_id in seen or not set(step.depends_on) <= seen:
+                raise ValueError("步骤编号不能重复；依赖只能指向计划中更早的步骤。")
             seen.add(step.step_id)
-        new_plan = {s.step_id: s for s in parsed}
-        for sid in self.outputs:
-            if sid not in new_plan or new_plan[sid] != self.plan[sid]:
-                raise ValueError("重新规划不得删除或改写已经成功执行的步骤")
-        self.plan = new_plan
-        self.status = {sid: self.status.get(sid, "pending") if sid in self.outputs else "pending"
-                       for sid in self.plan}
-        self.plan_version += 1
-        self.trace.event("plan", version=self.plan_version, steps=[s.model_dump() for s in parsed])
-        return {"plan_version": self.plan_version, "status": self.status}
+        self.trace.data["plan"] = [dict(step.model_dump(), status="pending") for step in parsed]
+        self.trace.save()
+        return {"status": "accepted", "steps": self.trace.data["plan"]}
+
+    def _resolve(
+        self, value: Any, dependencies: list[str], refs: list[dict], path="", units=None
+    ) -> Any:
+        if isinstance(value, dict):
+            if "$ref" in value:
+                if set(value) != {"$ref"} or not isinstance(value["$ref"], str):
+                    raise ValueError("结果引用只能包含字符串 $ref。")
+                ref = value["$ref"]
+                parts = ref.split(".")
+                if len(parts) < 2 or not re.fullmatch(r"s[1-9][0-9]?", parts[0]):
+                    raise ValueError("结果引用格式应为 s2.value。")
+                if parts[0] not in dependencies or parts[0] not in self.results:
+                    raise ValueError("只能引用已成功执行且声明为依赖的步骤。")
+                resolved: Any = self.results[parts[0]]
+                for part in parts[1:]:
+                    if not isinstance(resolved, dict) or part not in resolved:
+                        raise ValueError("结果引用字段不存在。")
+                    resolved = resolved[part]
+                source = self.results[parts[0]]
+                expected_unit = {
+                    "mass_flow_kg_s": "kg/s",
+                    "delta_t_k": "delta_K",
+                }.get(path)
+                if re.fullmatch(r"streams\[\d+\]\.flow_kg_h", path):
+                    expected_unit = "kg/h"
+                if units and path in units:
+                    expected_unit = units[path]
+                source_unit = (
+                    source.get("unit")
+                    if parts[-1] == "value"
+                    else {
+                        "total_flow_kg_h": "kg/h",
+                        "component_flow_kg_h": "kg/h",
+                        "mass_flow_kg_s": "kg/s",
+                        "delta_t_k": "delta_K",
+                    }.get(parts[-1])
+                )
+                record = {"argument": path, "ref": ref, "value": deepcopy(resolved)}
+                if expected_unit:
+                    if not source_unit:
+                        raise ValueError("数值结果引用缺少可核对的单位。")
+                    converted = convert_units(resolved, source_unit, expected_unit)["value"]
+                    record.update(
+                        source_value=resolved,
+                        source_unit=source_unit,
+                        unit=expected_unit,
+                        value=converted,
+                    )
+                    resolved = converted
+                if path == "specific_heat_kj_kg_k":
+                    raise ValueError("当前工具不能提供比热，请使用用户明确给出的比热。")
+                if (
+                    re.fullmatch(r"streams\[\d+\]\.mass_fraction", path)
+                    and parts[-1] != "mass_fraction"
+                ):
+                    raise ValueError("质量分数只能引用明确的 mass_fraction 字段。")
+                refs.append(record)
+                return deepcopy(resolved)
+            return {
+                k: self._resolve(v, dependencies, refs, f"{path}.{k}".strip("."), units)
+                for k, v in value.items()
+            }
+        if isinstance(value, list):
+            return [
+                self._resolve(v, dependencies, refs, f"{path}[{i}]", units)
+                for i, v in enumerate(value)
+            ]
+        return value
 
     def execute(self, tool_name: str, step_id: str, arguments: dict) -> dict:
-        resolved = deepcopy(arguments)
+        if self.trace.data["status"] != "running":
+            raise ValueError("任务已经结束，不能继续调用工具。")
+        call = {
+            "call_id": f"call_{len(self.trace.data['calls']) + 1}",
+            "step_id": step_id,
+            "tool_name": tool_name,
+            "requested_arguments": deepcopy(arguments),
+            "arguments": None,
+            "input_refs": [],
+            "started_at": utc_now(),
+            "status": "running",
+        }
+        self.trace.data["calls"].append(call)
+        step = next((s for s in self.trace.data["plan"] if s["step_id"] == step_id), None)
         try:
-            if step_id not in self.plan or self.plan[step_id].tool_name != tool_name:
-                raise ValueError("先调用 record_plan；step_id 与计划工具必须一致")
-            step = self.plan[step_id]
-            if step_id in self.outputs:
-                raise ValueError("成功步骤不能重复执行；新计算请增加新步骤")
-            if any(self.status.get(dep) != "success" for dep in step.depends_on):
-                raise ValueError("依赖步骤尚未成功，拒绝执行")
-            if set(arguments) - set(step.input_refs):
-                raise ValueError("每个显式参数都必须有计划 input_refs")
-            for key, ref in step.input_refs.items():
-                if ref.startswith("user:"):
-                    if key not in arguments:
-                        raise ValueError(f"缺少用户输入参数：{key}")
-                    continue
-                upstream, _, path = ref.partition(".")
-                value = self.outputs[upstream]
-                for part in path.split("."):
-                    value = value[int(part)] if isinstance(value, list) else value[part]
-                # Canonical value comes from successful execution, never model copy.
-                resolved[key] = deepcopy(value)
-                if tool_name == "calc_heat_duty":
-                    expected = {"mass_flow_kg_s": "kg/s", "cp_kj_kg_k": "kJ/(kg*K)", "delta_t_k": "K"}
-                    if key in expected:
-                        output = self.outputs[upstream]
-                        if self.plan[upstream].tool_name != "convert_units" or path != "value":
-                            raise ValueError("热负荷数值引用必须来自 convert_units.value，以核对单位")
-                        scale = ureg.Quantity(1, output["unit"]).to(expected[key]).magnitude
-                        if abs(scale - 1) > 1e-12:
-                            raise ValueError(f"引用数值单位必须与 {expected[key]} 一致，请先重新换算")
-                        if key == "delta_t_k" and output["quantity_kind"] != "temperature_difference":
-                            raise ValueError("热负荷必须引用温差，不能引用绝对温度")
+            if len(self.trace.data["calls"]) > 12:
+                raise ValueError("已达到本次任务的工具调用次数上限。")
+            if not step or step["tool_name"] != tool_name:
+                raise ValueError("工具和步骤必须与已登记计划一致。")
+            if step["status"] == "succeeded":
+                raise ValueError("此步骤已完成，请使用其现有结果。")
+            if not all(dep in self.results for dep in step["depends_on"]):
+                raise ValueError("前序步骤未成功，不能执行依赖计算。")
+            if not isinstance(arguments, dict):
+                raise ValueError("arguments 必须是参数对象。")
+            units = {"value": arguments.get("from_unit")} if tool_name == "convert_units" else None
+            resolved = self._resolve(arguments, step["depends_on"], call["input_refs"], units=units)
+            call["arguments"] = resolved
+            # Converting a flow before heat duty must feed the real conversion output.
+            conversion_deps = []
+            for prior in self.trace.data["plan"]:
+                if prior["step_id"] in step["depends_on"] and prior["tool_name"] == "convert_units":
+                    try:
+                        convert_units(1, self.results[prior["step_id"]]["unit"], "kg/s")
+                    except ValueError:
+                        continue
+                    conversion_deps.append(prior["step_id"])
+            if tool_name == "calc_heat_duty" and conversion_deps:
+                if not any(
+                    r["argument"] == "mass_flow_kg_s"
+                    and r["ref"] in {f"{dep}.value" for dep in conversion_deps}
+                    for r in call["input_refs"]
+                ):
+                    raise ValueError(
+                        "质量流量必须用 {$ref: 'sN.value'} 引用前序换算结果，不能重抄数值。"
+                    )
+            try:
+                inspect.signature(self.functions[tool_name]).bind(**resolved)
+            except TypeError:
+                raise ValueError("工具参数缺失或存在多余字段，请按工具说明提供参数。") from None
+            step["status"] = "running"
+            self.trace.save()
+            output = self.functions[tool_name](**resolved)
+            self.results[step_id] = output
+            call.update(output=output, status="succeeded")
+            step["status"] = "succeeded"
             if tool_name == "search_knowledge":
-                resolved.setdefault("top_k", self.settings.top_k)
-            data = SCHEMAS[tool_name].model_validate(resolved)
-            self.status[step_id] = "running"
-            self.trace.event("tool_start", step_id=step_id, tool_name=tool_name,
-                             plan_version=self.plan_version, depends_on=step.depends_on,
-                             input_refs=step.input_refs, supplied_arguments=arguments, arguments=data.model_dump())
-            if tool_name == "search_knowledge":
-                result = self.index.search(data.query, data.top_k, self.settings.min_score)
-                self.citations.update({hit["chunk_id"]: hit for hit in result["hits"]})
-            else:
-                result = FUNCTIONS[tool_name](data)
-            self.outputs[step_id] = result
-            self.status[step_id] = "success"
-            self.trace.event("tool_result", step_id=step_id, tool_name=tool_name, status="success", output=result)
-            return {"step_id": step_id, "status": "success", "output": result}
-        except Exception as exc:
-            if step_id in self.plan and step_id not in self.outputs:
-                self.status[step_id] = "failed"
-            self.trace.event("tool_result", step_id=step_id, tool_name=tool_name, status="failed",
-                             supplied_arguments=arguments, arguments=resolved, error=str(exc))
-            raise
+                existing = {h["chunk_id"] for h in self.trace.data["evidence"]}
+                self.trace.data["evidence"].extend(
+                    h for h in output["hits"] if h["chunk_id"] not in existing
+                )
+            return {"step_id": step_id, "status": "succeeded", "output": output}
+        except (ValueError, TypeError, KeyError) as exc:
+            if step and step["status"] != "succeeded":
+                step["status"] = "failed"
+            call.update(status="failed", error=str(exc))
+            raise ValueError(str(exc)) from None
+        finally:
+            call["finished_at"] = utc_now()
+            self.trace.save()
 
-    def validate_answer(self, answer, memory=None, **kwargs) -> bool:
-        text = str(answer)
-        if not text.strip():
-            raise ValueError("最终回答不能为空")
-        if not self.plan or any(self.status.get(sid) != "success" for sid in self.plan):
-            raise ValueError("存在未完成计划；修正或重新规划后回答")
-        references = set(re.findall(r"\[来源:([^\]]+)\]", text))
-        if references - self.citations.keys():
-            raise ValueError("引用包含本次未检索到的片段")
-        if self.citations and not references:
-            raise ValueError("回答需要使用 [来源:chunk_id] 引用实际检索片段")
-        if self.mode == "ask" and not any(s.tool_name == "search_knowledge" for s in self.plan.values()):
-            raise ValueError("知识问答必须实际检索")
-        return True
+    def complete(self, answer: str, status: str, citations: list[str]) -> str:
+        if status not in {"completed", "needs_input", "no_evidence", "failed", "out_of_scope"}:
+            raise ValueError("未知任务状态。")
+        if not isinstance(answer, str) or not answer.strip() or len(answer) > 16000:
+            raise ValueError("回答必须是非空的简短文本。")
+        evidence_ids = {h["chunk_id"] for h in self.trace.data["evidence"]}
+        if not isinstance(citations, list) or any(not isinstance(c, str) for c in citations):
+            raise ValueError("citations 必须是来源编号列表。")
+        if not set(citations) <= evidence_ids:
+            raise ValueError("引用必须来自本次实际检索命中的 chunk_id。")
+        if status == "completed":
+            if not self.trace.data["plan"] or any(
+                s["status"] != "succeeded" for s in self.trace.data["plan"]
+            ):
+                raise ValueError("计划尚未全部成功执行，不能声明完成。")
+            searches = [o for s, o in self.results.items() if "hits" in o]
+            if searches and not evidence_ids:
+                raise ValueError("检索没有证据，请使用 no_evidence 状态。")
+            if evidence_ids and not citations:
+                raise ValueError("回答需要引用本次检索来源。")
+        self.trace.finish(status, answer, citations)
+        return answer

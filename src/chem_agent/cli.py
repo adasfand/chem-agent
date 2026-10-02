@@ -1,43 +1,78 @@
+"""Reproducible command-line entry points."""
+
+from __future__ import annotations
+
 import argparse
 import json
+import re
 from pathlib import Path
 
-from .config import Settings
-from .knowledge import KnowledgeIndex
-from .trace import redact
+from chem_agent.agent import run_task
+from chem_agent.config import Settings
+from chem_agent.knowledge import KnowledgeBase
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="化工知识增强与工具调用")
-    parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="项目根目录")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("build-index")
-    search = commands.add_parser("search")
-    search.add_argument("question")
-    for name in ("ask", "task"):
-        commands.add_parser(name).add_argument("question")
-    example = commands.add_parser("example")
-    example.add_argument("case_id", choices=["A", "B", "C"])
+    commands.add_parser("doctor", help="检查本机环境和配置，不发起模型请求")
+    commands.add_parser("index", help="从知识卡重建检索索引并输出资料清单")
+    search = commands.add_parser("search", help="离线检索知识卡")
+    search.add_argument("query")
+    run = commands.add_parser("run", help="调用实际模型处理任务（消耗 API 额度）")
+    run.add_argument("question")
+    run.add_argument("--follow-up", help="延续 runs/ 中指定 run_id 的上下文")
+    commands.add_parser("ui", help="启动本机界面")
     args = parser.parse_args()
-    settings = Settings.load(args.root)
     try:
-        if args.command == "build-index":
-            index = KnowledgeIndex.build(settings.knowledge_dir, settings.index_dir)
-            result = {"documents": len(index.snapshot["documents"]), "chunks": len(index.chunks),
-                      "corpus_sha256": index.snapshot["corpus_sha256"]}
-        elif args.command == "search":
-            index = KnowledgeIndex.load(settings.index_dir, settings.knowledge_dir)
-            result = index.search(args.question, settings.top_k, settings.min_score)
+        settings = Settings.load(args.root)
+        if args.command == "ui":
+            from chem_agent.ui import launch
+
+            launch(settings)
+            return 0
+        if args.command in {"doctor", "index", "search"}:
+            knowledge = KnowledgeBase(settings.knowledge_dir)
+            if args.command == "doctor":
+                import platform
+
+                result = {
+                    "python": platform.python_version(),
+                    "knowledge_cards": len(knowledge.inventory()),
+                    "knowledge_version": knowledge.version,
+                    "model": settings.model,
+                    "credentials_configured": bool(settings.api_key),
+                    "mode": "configuration_check_only",
+                }
+            elif args.command == "index":
+                result = {"version": knowledge.version, "documents": knowledge.inventory()}
+                output = settings.root / "build" / "knowledge_manifest.json"
+                output.parent.mkdir(exist_ok=True)
+                output.write_text(
+                    json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+            else:
+                result = knowledge.search(args.query)
         else:
-            from .service import run_task
-            question, mode = getattr(args, "question", ""), args.command
-            if args.command == "example":
-                cases = json.loads((settings.root / "examples/tasks.json").read_text(encoding="utf-8"))
-                case = next(c for c in cases if c["id"] == args.case_id)
-                question, mode = case["question"], case["mode"]
-            result = run_task(settings, question, mode)
+            history = []
+            if args.follow_up:
+                if not re.fullmatch(r"\d{8}T\d{6}-[a-f0-9]{10}", args.follow_up):
+                    raise ValueError("无效的 run_id。")
+                previous = json.loads(
+                    (settings.runs_dir / f"{args.follow_up}.json").read_text(encoding="utf-8")
+                )
+                history = previous.get("history", []) + [
+                    {"role": "user", "content": previous["question"]},
+                    {"role": "assistant", "content": previous["answer"]},
+                ]
+            result = run_task(args.question, settings, history=history)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 1 if result.get("status") == "failed" else 0
-    except Exception as exc:
-        print(json.dumps({"status": "failed", "error": redact(str(exc), (settings.api_key, settings.api_base))}, ensure_ascii=False))
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

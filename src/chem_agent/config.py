@@ -1,52 +1,73 @@
-"""Configuration relative to an explicitly selected project root."""
-from dataclasses import dataclass
-import os
-from pathlib import Path
+"""Local configuration; never serialize credentials into run records."""
 
-from dotenv import load_dotenv
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from urllib.parse import urlparse
+
+from dotenv import dotenv_values
 
 
 @dataclass(frozen=True)
 class Settings:
     root: Path
-    knowledge_dir: Path
-    index_dir: Path
-    runs_dir: Path
-    model_id: str
-    api_base: str
-    api_key: str
-    timeout: float
-    max_steps: int
-    planning_interval: int
-    top_k: int
-    min_score: float
+    api_key: str = field(default="", repr=False)
+    base_url: str = "https://api.deepseek.com"
+    model: str = "deepseek-v4-pro"
+    request_timeout: float = 60
+    max_steps: int = 12
+
+    @property
+    def knowledge_dir(self) -> Path:
+        return self.root / "data" / "knowledge"
+
+    @property
+    def runs_dir(self) -> Path:
+        return self.root / "runs"
+
+    def public(self) -> dict:
+        return {
+            "model": self.model,
+            "base_url": self.base_url,
+            "request_timeout": self.request_timeout,
+            "max_steps": self.max_steps,
+        }
 
     @classmethod
-    def load(cls, root: Path) -> "Settings":
-        root = root.resolve()
-        load_dotenv(root / ".env", override=False)
-        def path(key: str, default: str) -> Path:
-            return (root / os.getenv(key, default)).resolve()
-        result = cls(
-            root, path("CHEM_KNOWLEDGE_DIR", "data/knowledge-example"),
-            path("CHEM_INDEX_DIR", "data/index"), path("CHEM_RUNS_DIR", "runs"),
-            os.getenv("CHEM_MODEL_ID", ""), os.getenv("CHEM_API_BASE", ""),
-            os.getenv("CHEM_API_KEY", ""), float(os.getenv("CHEM_TIMEOUT", "60")),
-            int(os.getenv("CHEM_MAX_STEPS", "12")),
-            int(os.getenv("CHEM_PLANNING_INTERVAL", "3")),
-            int(os.getenv("CHEM_TOP_K", "4")), float(os.getenv("CHEM_MIN_SCORE", "0.05")),
+    def load(cls, root: Path | None = None) -> Settings:
+        root = (root or Path(os.environ.get("CHEM_PROJECT_ROOT", Path.cwd()))).resolve()
+        config = {**dotenv_values(root / ".env"), **os.environ}
+        key = config.get("DEEPSEEK_API_KEY", "") or ""
+        key_file = config.get("DEEPSEEK_API_KEY_FILE", "")
+        if not key and key_file:
+            path = Path(key_file).expanduser()
+            if not path.is_absolute():
+                path = root / path
+            try:
+                key = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                raise ValueError(
+                    "无法读取 DEEPSEEK_API_KEY_FILE，请检查本机配置和文件权限。"
+                ) from None
+        base_url = config.get("DEEPSEEK_BASE_URL") or "https://api.deepseek.com"
+        parsed = urlparse(base_url)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("模型地址不能包含凭据、查询参数或片段。")
+        if parsed.scheme != "https" and not (
+            parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        ):
+            raise ValueError("模型地址需要使用 HTTPS；本地服务可使用 HTTP。")
+        timeout = float(config.get("CHEM_REQUEST_TIMEOUT") or 60)
+        steps = int(config.get("CHEM_MAX_STEPS") or 12)
+        if not 1 <= timeout <= 180 or not 2 <= steps <= 20:
+            raise ValueError("请求超时应为 1–180 秒，最大执行步数应为 2–20。")
+        return cls(
+            root=root,
+            api_key=key,
+            base_url=base_url,
+            model=config.get("DEEPSEEK_MODEL") or "deepseek-v4-pro",
+            request_timeout=timeout,
+            max_steps=steps,
         )
-        if not (0 < result.timeout < 3600 and 1 <= result.max_steps <= 30
-                and 1 <= result.planning_interval <= 30 and 1 <= result.top_k <= 20
-                and 0 < result.min_score <= 1):
-            raise ValueError("配置范围错误：timeout/steps/planning_interval/top_k/min_score")
-        return result
-
-    def require_model(self) -> None:
-        if not all((self.model_id, self.api_base, self.api_key)):
-            raise ValueError("请在 .env 配置 CHEM_MODEL_ID、CHEM_API_BASE、CHEM_API_KEY")
-
-    def public_summary(self) -> dict:
-        return {"model_id": self.model_id, "max_steps": self.max_steps,
-                "planning_interval": self.planning_interval, "top_k": self.top_k,
-                "min_score": self.min_score, "timeout": self.timeout}
