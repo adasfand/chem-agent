@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 const labels = {running:"运行中",completed:"已完成",needs_input:"等待补充",no_evidence:"资料不足",failed:"未完成",out_of_scope:"不适用",cancelled:"已取消",pending:"待执行",succeeded:"成功"};
 const toolNames = {search_knowledge:"检索知识资料",convert_units:"核对并换算单位",calc_heat_duty:"计算显热负荷",calc_mass_balance:"计算混合衡算"};
-const state = {job:null, runs:[], activeId:null, view:"summary", poll:null, rendering:"", busy:false, configured:false, submitting:false, selectionVersion:0, sessionVersion:0, cancellingId:null, loadingId:null};
+const state = {job:null, runs:[], activeId:null, view:"summary", selectedEntity:null, poll:null, rendering:"", busy:false, configured:false, indexStatus:null, submitting:false, selectionVersion:0, sessionVersion:0, cancellingId:null, loadingId:null};
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jsonText = (value) => esc(JSON.stringify(value, null, 2));
 const badge = (status) => `<span class="badge ${Object.hasOwn(labels,status) ? status : "neutral"}">${esc(labels[status] || status)}</span>`;
@@ -82,7 +82,7 @@ async function refreshSession() {
   return session;
 }
 function welcome() {
-  return `<div class="welcome"><div class="signal" aria-hidden="true"><span></span><span></span><span></span></div><p class="ready-label">READY</p><h3>等待输入</h3><div class="capabilities"><div class="capability"><span class="cap-number">01</span><strong>显热负荷</strong><code>Q = ṁ · cp · ΔT</code></div><div class="capability"><span class="cap-number">02</span><strong>混合衡算</strong><code>Σ ṁ in = Σ ṁ out</code></div><div class="capability"><span class="cap-number">03</span><strong>单位换算</strong><code>MPa → kPa</code></div><div class="capability"><span class="cap-number">04</span><strong>知识查询</strong><code>15 teaching cards</code></div></div></div>`;
+  return `<div class="welcome"><div class="signal" aria-hidden="true"><span></span><span></span><span></span></div><p class="ready-label">TRACEABLE WORKFLOW</p><h3>从问题走到依据</h3><p class="welcome-copy">输入实际工况或概念问题。任务运行后，可沿路径查看本轮检索返回的知识关系、来源片段，以及每次工具调用如何使用前一步的结果。</p><div class="workflow-preview" aria-label="任务流程"><span>问题</span><i aria-hidden="true">→</i><span>检索与计算</span><i aria-hidden="true">→</i><span>结果与依据</span></div></div>`;
 }
 
 function metrics(result) {
@@ -101,6 +101,139 @@ function metrics(result) {
   }
   return cards.length?`<div class="metrics">${cards.join("")}</div>`:"";
 }
+const list = (value) => Array.isArray(value) ? value.filter(Boolean) : value ? [value] : [];
+const safeUrl = (value) => typeof value==="string" && /^https?:\/\/[^\s<>"']+$/i.test(value) ? value : "";
+const sourceText = (item) => item?.source || item?.url || item?.file_path || item?.doc_id || "来源未标注";
+function sourceLabel(item) {
+  const label=sourceText(item), url=safeUrl(item?.url || (safeUrl(label)?label:""));
+  return url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`:esc(label);
+}
+function retrievalFor(call) {
+  const output=call.output || {};
+  const data=output.retrieval && typeof output.retrieval==="object" ? output.retrieval : {};
+  const hits=list(output.hits);
+  const chunks=hits;
+  return {data,hits,chunks,entities:list(data.entities),relationships:list(data.relationships),references:list(data.references),graphSources:list(data.graph_sources)};
+}
+function sourceIds(record) {
+  return [...new Set([...list(record?.source_ids),...list(record?.source_id)].flatMap(value=>String(value).split(/<SEP>/i)).map(value=>value.trim()).filter(Boolean))];
+}
+function descriptionParts(value) {
+  const seen=new Set();
+  return list(value).flatMap(part=>String(part).split(/<SEP>/i)).map(part=>part.trim()).filter(part=>{
+    const key=part.replace(/\s+/g," ").toLocaleLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);return true;
+  });
+}
+function entityDescription(value) {
+  const parts=descriptionParts(value);
+  if(!parts.length)return "<p>本轮未返回实体说明。</p>";
+  if(parts.length===1)return `<p>${esc(parts[0])}</p>`;
+  return `<ul class="entity-description-list">${parts.map(part=>`<li>${esc(part)}</li>`).join("")}</ul>`;
+}
+function relationDescription(value) {
+  const parts=descriptionParts(value);
+  return parts.length?`<div class="graph-relation-description">${parts.map(part=>`<p>${esc(part)}</p>`).join("")}</div>`:"";
+}
+function chunkPreview(value) {
+  return String(value||"").split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!/^#(?:\s|$)/.test(line)&&!/^(?:资料来源|原始来源|来源|source)\s*[:：]/i.test(line)).map(line=>line.replace(/^#{2,6}\s*/,"")).join(" ").replace(/\s+/g," ").trim();
+}
+function relatedChunks(entity, chunks) {
+  const ids=new Set(sourceIds(entity));
+  const names=new Set([entity.id,entity.name,entity.entity_name].filter(Boolean).map(String));
+  return chunks.filter(chunk=>ids.has(String(chunk.chunk_id||chunk.reference_id||chunk.id||"")) || list(chunk.entity_ids).some(id=>names.has(String(id))));
+}
+function graphSourceCard(id, source, hitIds) {
+  if(!source)return `<div class="graph-source-card unresolved"><strong>未解析来源</strong><code>${esc(id)}</code><p>索引未提供该编号的原文或出处，不能据此核验。</p></div>`;
+  const title=source.title||source.chunk_id||id;
+  const preview=chunkPreview(source.text);
+  const alsoHit=hitIds.has(id);
+  return `<details class="graph-source-card"><summary><span>${esc(title)}</span><em>${alsoHit?"图谱支撑 · 同时命中":"图谱支撑 · 非命中"}</em></summary><p class="graph-source-excerpt">${esc(preview.slice(0,200))}${preview.length>200?"…":""}</p><p class="graph-source-origin">来源：${sourceLabel(source)}</p><small>片段编号 ${esc(id)}</small>${source.text?`<div class="graph-source-original"><span>原文</span><article class="prose">${markdown(source.text)}</article></div>`:"<p>索引没有提供原文。</p>"}</details>`;
+}
+function graphSourceCards(ids, graphSources, hits) {
+  if(!ids.length)return '<p class="graph-source-missing">图谱未返回来源编号，无法追溯该节点的原文。</p>';
+  const byId=new Map(graphSources.map(source=>[String(source.chunk_id||""),source]));
+  const hitIds=new Set(hits.map(hit=>String(hit.chunk_id||"")));
+  return `<div class="graph-source-list">${ids.map(id=>graphSourceCard(id,byId.get(id),hitIds)).join("")}</div>`;
+}
+function entityMap(entities, relationships, queryIndex, selectedIndex) {
+  const visible=entities.slice(0,9).map((entity,index)=>({
+    id:String(entity.id||entity.name||entity.entity_name||index),
+    name:String(entity.name||entity.entity_name||entity.id||`实体 ${index+1}`),
+    type:String(entity.type||entity.entity_type||""),
+  }));
+  if(!visible.length)return '<div class="path-empty">本轮没有返回可展示的实体。</div>';
+  const positions=visible.map((node,index)=>{
+    const angle=-Math.PI/2+2*Math.PI*index/visible.length;
+    return {...node,x:visible.length===1?320:320+Math.cos(angle)*220,y:visible.length===1?170:170+Math.sin(angle)*120};
+  });
+  const byId=new Map();
+  for(const node of positions){byId.set(node.id.toLowerCase(),node);byId.set(node.name.toLowerCase(),node);}
+  let drawn=0;
+  const lines=relationships.map(rel=>{
+    const from=byId.get(String(rel.source||rel.src_id||"").toLowerCase());
+    const to=byId.get(String(rel.target||rel.tgt_id||"").toLowerCase());
+    if(!from || !to || from===to)return "";
+    drawn++;
+    return `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" class="graph-edge"><title>${esc(rel.description||rel.keywords||`${from.name} → ${to.name}`)}</title></line>`;
+  }).join("");
+  const nodes=positions.map((node,index)=>`<g class="graph-node${index===selectedIndex?" selected":""}" role="button" tabindex="0" aria-label="查看实体 ${esc(node.name)}" data-query-index="${queryIndex}" data-entity-index="${index}"><circle cx="${node.x}" cy="${node.y}" r="40"></circle><text x="${node.x}" y="${node.y+4}" text-anchor="middle">${esc(node.name.slice(0,7))}${node.name.length>7?"…":""}</text><title>${esc(node.name)}${node.type?` · ${esc(node.type)}`:""}</title></g>`).join("");
+  return `<div class="entity-graph"><svg viewBox="0 0 640 340" role="group" aria-label="${visible.length} 个检索实体、${drawn} 条实体关系">${lines}${nodes}</svg><p>选择实体查看说明和关联片段。图中只连接本轮返回且端点可匹配的关系。${entities.length>visible.length?`显示前 ${visible.length} / ${entities.length} 个实体。`:""}</p></div>`;
+}
+function retrievalCard(call, index, citations) {
+  const {data,hits,chunks,entities,relationships,references,graphSources}=retrievalFor(call);
+  const query=data.query||call.arguments?.query||call.requested_arguments?.query||"查询未记录";
+  const mode=data.mode||"未标注";
+  const high=list(data.keywords?.high_level), low=list(data.keywords?.low_level);
+  const keywords=(high.length||low.length)?`<div class="keyword-groups">${high.length?`<div><small>主题词</small>${high.map(word=>`<span>${esc(word)}</span>`).join("")}</div>`:""}${low.length?`<div><small>细节词</small>${low.map(word=>`<span>${esc(word)}</span>`).join("")}</div>`:""}</div>`:"<p class=\"path-muted\">本轮没有返回关键词。</p>";
+  const relationRows=relationships.length?`<details class="graph-relations"><summary>查看 ${relationships.length} 条返回的关系及其来源</summary><ul>${relationships.map(rel=>`<li><strong>${esc(rel.source||rel.src_id||"?")}</strong><span>→</span><strong>${esc(rel.target||rel.tgt_id||"?")}</strong>${relationDescription(rel.description)}<div class="graph-source-label">关系支撑片段 · ${sourceIds(rel).length}</div>${graphSourceCards(sourceIds(rel),graphSources,hits)}</li>`).join("")}</ul></details>`:"";
+  const refsByChunk=new Map(references.map(ref=>[String(ref.chunk_id||ref.reference_id||""),ref]));
+  const selectedIndex=state.selectedEntity?.queryIndex===index?Math.min(state.selectedEntity.entityIndex,entities.length-1):0;
+  const selected=entities[selectedIndex];
+  const linked=selected?relatedChunks(selected,hits):[];
+  const activeIds=new Set(linked.map(chunk=>String(chunk.chunk_id||chunk.reference_id||chunk.id||"")));
+  const details=selected?`<div class="entity-detail"><small>实体详情 · ${esc(selected.type||selected.entity_type||"未分类")}</small><strong>${esc(selected.name||selected.entity_name||selected.id||"未命名实体")}</strong>${entityDescription(selected.description)}<div class="entity-links">${linked.length?`关联本轮命中片段：${linked.map(chunk=>esc(chunk.title||chunk.document_title||chunk.chunk_id||"片段")).join("、")}`:"该实体没有明确关联到本轮命中片段；下方图谱支撑资料可能来自索引中的其他片段。"}</div><div class="graph-source-label">实体支撑片段 · ${sourceIds(selected).length}</div>${graphSourceCards(sourceIds(selected),graphSources,hits)}</div>`:"";
+  const graphSourceIndex=graphSources.length?`<details class="graph-source-index"><summary>全部图谱支撑资料 · ${graphSources.length} 份（含非命中片段）</summary>${graphSourceCards([...new Set(graphSources.map(source=>String(source.chunk_id||"")).filter(Boolean))],graphSources,hits)}</details>`:"";
+  const chunkRows=chunks.length?chunks.map((chunk,i)=>{
+    const id=String(chunk.chunk_id||chunk.reference_id||chunk.id||`片段 ${i+1}`);
+    const source=refsByChunk.get(id)||chunk;
+    const title=chunk.title||chunk.document_title||`片段 ${i+1}`;
+    const excerpt=chunkPreview(chunk.text||chunk.content);
+    return `<div class="path-chunk${activeIds.has(id)?" related":""}"><div><span class="path-node-index">${String(i+1).padStart(2,"0")}</span><strong>${esc(title)}</strong>${citations.has(id)?'<span class="path-cited">已引用</span>':""}</div><p>${esc(excerpt.slice(0,175))}${excerpt.length>175?"…":""}</p><small>${esc(id)} · ${sourceLabel(source)}</small></div>`;
+  }).join(""):"<div class=\"path-empty\">本轮检索没有返回片段。</div>";
+  const independent=references.filter(ref=>!chunks.some(chunk=>String(chunk.chunk_id||chunk.reference_id||chunk.id||"")===String(ref.chunk_id||ref.reference_id||"")));
+  const independentSources=independent.length?`<details class="path-references"><summary>另有 ${independent.length} 条来源记录</summary><ul>${independent.map(ref=>`<li>${esc(ref.chunk_id||ref.reference_id||"来源")} · ${sourceLabel(ref)}</li>`).join("")}</ul></details>`:"";
+  return `<section class="retrieval-card"><div class="path-query"><span class="path-node-index">${String(index+1).padStart(2,"0")}</span><div><small>检索查询 · ${esc(mode)}</small><strong>${esc(query)}</strong></div><span class="path-count">${hits.length} 命中</span></div><div class="path-branch"><div class="path-branch-head"><span>01 · 查询展开</span><span>02 · 实体关系与支撑资料</span><span>03 · 本轮命中片段</span></div><div class="path-keywords">${keywords}</div><div class="path-entities">${entityMap(entities,relationships,index,selectedIndex)}${details}${relationRows}${graphSourceIndex}</div><div class="path-chunks">${chunkRows}${independentSources}</div></div></section>`;
+}
+function toolOutput(call) {
+  if(!call)return "尚未调用";
+  if(call.status==="failed")return esc(call.error||"调用失败");
+  if(call.status!=="succeeded")return "运行中";
+  const out=call.output||{};
+  if(call.tool_name==="search_knowledge")return `返回 ${list(out.hits).length} 个片段`;
+  if(call.tool_name==="convert_units")return `${numeric(out.value)} ${esc(out.unit||"")}`;
+  if(call.tool_name==="calc_heat_duty")return `${numeric(out.heat_duty_kw)} kW`;
+  if(call.tool_name==="calc_mass_balance")return `${numeric(out.total_flow_kg_h)} kg/h`;
+  return "已返回结果";
+}
+function toolFlow(result) {
+  const plan=list(result.plan), calls=list(result.calls);
+  if(!plan.length && !calls.length)return '<div class="path-empty">本轮尚无工具调用。</div>';
+  const entries=[...calls.map(call=>({call,step:plan.find(step=>step.step_id===call.step_id)||{step_id:call.step_id,tool_name:call.tool_name,goal:toolNames[call.tool_name]||call.tool_name,depends_on:[]}})),...plan.filter(step=>!calls.some(call=>call.step_id===step.step_id)).map(step=>({call:null,step}))];
+  return `<div class="tool-flow">${entries.map(({call,step},index)=>{
+    const deps=list(step.depends_on);
+    const refs=list(call?.input_refs);
+    const status=call?.status||step.status||"pending";
+    return `<div class="tool-flow-item ${esc(status)}"><span class="tool-flow-line" aria-hidden="true"></span><span class="tool-flow-dot" aria-hidden="true">${String(index+1).padStart(2,"0")}</span><div class="tool-flow-body"><div class="tool-flow-top"><div><small>${esc(call?.call_id||step.step_id||`s${index+1}`)} · ${esc(toolNames[step.tool_name]||step.tool_name||"工具")}</small><strong>${esc(step.goal||"工具调用")}</strong></div>${badge(status)}</div>${deps.length?`<p class="tool-deps">计划依赖 ${deps.map(esc).join("、")}</p>`:""}<div class="tool-result"><span>实际结果</span><strong>${toolOutput(call)}</strong></div>${refs.length?`<div class="tool-refs">${refs.map(ref=>`<span>${esc(ref.ref)} → ${esc(ref.argument)}${ref.value!==undefined?` = ${esc(ref.value)} ${esc(ref.unit||"")}`:""}</span>`).join("")}</div>`:""}</div></div>`;
+  }).join("")}</div>`;
+}
+function pathView(result) {
+  const searches=list(result.calls).filter(call=>call.tool_name==="search_knowledge" && call.output);
+  const citations=new Set(result.citations||[]);
+  const retrieval=searches.length?searches.map((call,index)=>retrievalCard(call,index,citations)).join(""):'<div class="path-empty">本轮没有知识检索调用。计算任务仍可在下方查看工具执行链。</div>';
+  return `<div class="path-view"><p class="path-intro">节点与关系来自本轮检索返回；图谱支撑片段按 source_ids 从索引解析，可能不在本轮命中列表。工具链按实际调用、计划依赖和结果引用展示。</p><div class="path-section-heading"><span>KNOWLEDGE RETRIEVAL</span><h3>知识检索路径 <em>${searches.length}</em></h3></div>${retrieval}<div class="path-section-heading tool-heading"><span>TOOL EXECUTION</span><h3>工具执行链 <em>${list(result.calls).length}</em></h3></div>${toolFlow(result)}</div>`;
+}
 function summary(result) {
   const status=result.status;
   if(!state.job.finished){
@@ -111,6 +244,7 @@ function summary(result) {
   let output=callouts[status]?`<div class="state-callout"><strong>${callouts[status][0]}</strong>${callouts[status][1]}</div>`:"";
   if(result.record_warning)output+=`<div class="state-callout">${esc(result.record_warning)}</div>`;
   output+=metrics(result);
+  if(result.calls?.length)output+=`<button type="button" class="path-open" data-action="open-path"><span>查看本轮检索与工具路径</span><span aria-hidden="true">↗</span></button>`;
   output+=`<div class="content-label">${status==="completed"?"说明":"说明"}</div><article class="prose">${markdown(result.answer || "本轮没有产生可显示的答复，请查看执行过程。")}</article>`;
   const conditions=[...new Set((result.calls||[]).filter(c=>c.status==="succeeded").flatMap(c=>c.output?.assumptions||[]))];
   if(conditions.length)output+=`<details class="followup-note"><summary>工具适用条件 · ${conditions.length} 项</summary><ul>${conditions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></details>`;
@@ -126,9 +260,11 @@ function steps(result) {
 function evidence(result) {
   const citations=new Set(result.citations || []);
   if(!result.evidence?.length)return '<div class="empty-state">本轮无检索记录。</div>';
-  return '<p class="evidence-intro">自编教学资料。相关度仅用于检索排序。</p>'+result.evidence.map(hit=>{
+  const modes=[...new Set(list(result.calls).filter(call=>call.tool_name==="search_knowledge").map(call=>call.output?.retrieval?.mode).filter(Boolean))];
+  const intro=modes.length?`本轮检索模式：${modes.map(esc).join("、")}。相关度仅用于排序，不代表事实可靠性。`:"本轮返回的资料片段。相关度仅用于排序，不代表事实可靠性。";
+  return `<p class="evidence-intro">${intro}</p>`+result.evidence.map(hit=>{
     const excerpt=String(hit.text||"").split("\n").filter(line=>!/^\s*#/.test(line)).join("\n").trim();
-    return `<section class="evidence-card"><header><h3>${esc(hit.title)}</h3><span class="badge ${citations.has(hit.chunk_id)?"":"neutral"}">${citations.has(hit.chunk_id)?"已引用":"仅检索"}</span></header><p class="evidence-source">${esc(hit.chunk_id)} · 相关度 ${Number.isFinite(hit.score)?hit.score.toFixed(3):"—"}</p><p class="evidence-preview">${esc(excerpt.slice(0,145))}${excerpt.length>145?"…":""}</p><details><summary>展开资料与来源</summary><article class="prose">${markdown(hit.text)}</article><p class="evidence-source">来源：${esc(hit.source)}</p></details></section>`;
+    return `<section class="evidence-card"><header><h3>${esc(hit.title)}</h3><span class="badge ${citations.has(hit.chunk_id)?"":"neutral"}">${citations.has(hit.chunk_id)?"已引用":"仅检索"}</span></header><p class="evidence-source">${esc(hit.chunk_id)} · 相关度 ${Number.isFinite(hit.score)?hit.score.toFixed(3):"—"}</p><p class="evidence-preview">${esc(excerpt.slice(0,145))}${excerpt.length>145?"…":""}</p><details><summary>展开资料与来源</summary><article class="prose">${markdown(hit.text)}</article><p class="evidence-source">来源：${sourceLabel(hit)}</p></details></section>`;
   }).join("");
 }
 function render(force=false) {
@@ -136,7 +272,7 @@ function render(force=false) {
   const signature=JSON.stringify([state.view,state.job]);
   if(!force && signature===state.rendering)return;
   state.rendering=signature;
-  $("panel-content").innerHTML=!result?welcome():state.view==="steps"?steps(result):state.view==="evidence"?evidence(result):summary(result);
+  $("panel-content").innerHTML=!result?welcome():state.view==="path"?pathView(result):state.view==="steps"?steps(result):state.view==="evidence"?evidence(result):summary(result);
   $("step-count").textContent=result?.plan?.length||0;
   $("evidence-count").textContent=result?.evidence?.length||0;
   $("run-status").className=`badge ${result?.status||"neutral"}`;
@@ -156,11 +292,31 @@ function selectView(view) {
   $("panel-content").setAttribute("aria-labelledby",`tab-${view}`);
   render(true);$("panel-content").scrollTop=0;
 }
+function selectEntity(queryIndex, entityIndex) {
+  if(!Number.isInteger(queryIndex)||!Number.isInteger(entityIndex)||queryIndex<0||entityIndex<0)return;
+  state.selectedEntity={queryIndex,entityIndex};
+  render(true);
+  document.querySelector?.(`[data-query-index="${queryIndex}"][data-entity-index="${entityIndex}"]`)?.focus();
+}
+function renderIndexStatus(status) {
+  const node=$("index-status");
+  if(!status || typeof status!=="object"){
+    node.className="index-status unknown";
+    node.textContent="知识索引状态未提供；运行后请核对实际检索记录。";
+    return;
+  }
+  const ready=status.state==="ready" && status.backend==="lightrag";
+  const count=Number.isFinite(status.document_count)?`${status.document_count} 份资料`:"";
+  const chunks=Number.isFinite(status.chunk_count)?`${status.chunk_count} 个片段`:"";
+  const detail=[count,chunks].filter(Boolean).join(" · ");
+  node.className=`index-status ${ready?"ready":"degraded"}`;
+  node.textContent=ready?`LightRAG 图谱索引就绪${detail?` · ${detail}`:""}`:`${status.message||"知识索引尚未就绪。"}${status.backend==="lexical"?" 当前使用词法检索降级。":""}`;
+}
 function closeExports() {$("export-menu").hidden=true;$("export-toggle").setAttribute("aria-expanded","false");}
 function closeSidebar() {$("sidebar").classList.remove("open");$("history-toggle").setAttribute("aria-expanded","false");}
 function startNew(question="") {
   if(state.busy){notice("请等待当前任务完成，或先停止任务。");return;}
-  ++state.selectionVersion;clearTimeout(state.poll);state.job=null;state.activeId=null;state.loadingId=null;state.rendering="";
+  ++state.selectionVersion;clearTimeout(state.poll);state.job=null;state.activeId=null;state.loadingId=null;state.selectedEntity=null;state.rendering="";
   $("question").value=question;updateCount();selectView("summary");renderHistory();closeSidebar();closeExports();$("question").focus();
 }
 function updateCount() {$("char-count").textContent=`${$("question").value.length} / 4000`;}
@@ -179,7 +335,7 @@ async function loadJob(id) {
 }
 function showJob(job) {
   if(notice.connection){$("notice").hidden=true;notice.connection=false;}
-  state.activeId=job.job_id;state.job=job;state.loadingId=null;
+  state.activeId=job.job_id;state.job=job;state.loadingId=null;state.selectedEntity=null;
   $("question").value="";updateCount();selectView("summary");renderHistory();closeSidebar();closeExports();
   if(!job.finished)schedulePoll(job.job_id);
 }
@@ -265,6 +421,17 @@ document.querySelectorAll(".tab").forEach((tab,index)=>{
   tab.addEventListener("click",()=>selectView(tab.dataset.view));
   tab.addEventListener("keydown",event=>{const tabs=[...document.querySelectorAll(".tab")];let next;if(event.key==="ArrowRight")next=(index+1)%tabs.length;if(event.key==="ArrowLeft")next=(index+tabs.length-1)%tabs.length;if(event.key==="Home")next=0;if(event.key==="End")next=tabs.length-1;if(next!==undefined){event.preventDefault();selectView(tabs[next].dataset.view);tabs[next].focus();}});
 });
+$("panel-content").addEventListener("click",event=>{
+  if(event.target.closest('[data-action="open-path"]')){selectView("path");return;}
+  const entity=event.target.closest("[data-entity-index]");
+  if(entity)selectEntity(Number(entity.dataset.queryIndex),Number(entity.dataset.entityIndex));
+});
+$("panel-content").addEventListener("keydown",event=>{
+  if(event.key!=="Enter"&&event.key!==" ")return;
+  const entity=event.target.closest("[data-entity-index]");
+  if(!entity)return;
+  event.preventDefault();selectEntity(Number(entity.dataset.queryIndex),Number(entity.dataset.entityIndex));
+});
 $("export-toggle").addEventListener("click",()=>{const open=$("export-menu").hidden;$("export-menu").hidden=!open;$("export-toggle").setAttribute("aria-expanded",String(open));});
 document.addEventListener("click",event=>{if(!event.target.closest(".export-wrap"))closeExports();if(!event.target.closest("#sidebar")&&!event.target.closest("#history-toggle"))closeSidebar();});
 document.addEventListener("keydown",event=>{if(event.key==="Escape"){closeExports();closeSidebar();}});
@@ -283,7 +450,8 @@ async function openKnowledge(item,button) {
 async function boot() {
   render();
   try{
-    const data=await api("/api/bootstrap");state.configured=data.configured;
+    const data=await api("/api/bootstrap");state.configured=data.configured;state.indexStatus=data.index_status;
+    renderIndexStatus(state.indexStatus);
     $("version").textContent=`v${data.version}`;
     $("model-status").textContent=data.configured?"DeepSeek":"尚未配置模型";
     $("model-status").title=data.model;

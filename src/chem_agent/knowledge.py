@@ -90,11 +90,15 @@ class KnowledgeBase:
         self._matrix = None
         self._title_matrix = None
         digest = hashlib.sha256()
-        files = sorted(
-            path
-            for path in self.directory.rglob("*")
-            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
-        )
+        root = self.directory.resolve()
+        files = []
+        for path in sorted(self.directory.rglob("*")):
+            if path.suffix.lower() not in {".md", ".txt"}:
+                continue
+            if path.is_symlink() or not path.resolve().is_relative_to(root):
+                raise ValueError("知识目录不支持符号链接文件。")
+            if path.is_file():
+                files.append(path)
         for path in files:
             relative = path.relative_to(self.directory).as_posix()
             raw = path.read_bytes()

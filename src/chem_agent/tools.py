@@ -8,7 +8,7 @@ from chem_agent.execution import Execution
 from chem_agent.model import RunCancelled
 
 DESCRIPTIONS = {
-    "search_knowledge": '检索本地化工知识。arguments={"query":"显热公式适用条件","top_k":3}。返回 hits 的 chunk_id 用于引用。无相关资料时不能编造来源。',
+    "search_knowledge": '检索本地化工资料；索引就绪时使用 LightRAG 图谱与向量混合检索。arguments={"query":"显热公式适用条件","top_k":3}。返回 hits 的 chunk_id 用于引用；retrieval 包含本轮实际实体、关系和片段。命中不代表事实正确，无相关资料时不能编造来源。',
     "convert_units": '换算兼容量纲的常用单位。arguments={"value":1000,"from_unit":"kg/h","to_unit":"kg/s"}。返回 value、unit。温差用 delta_degC、delta_K；绝对温度用 degC、K。',
     "calc_heat_duty": '计算单相恒比热显热负荷。arguments={"mass_flow_kg_s":{"$ref":"s2.value"},"specific_heat_kj_kg_k":4.18,"delta_t_k":40}。比热必须由用户给出，不能查表代填。温差可由明确起止温度作差。若依赖换算步骤，质量流量必须使用 $ref。返回 heat_duty_kw、inputs、assumptions。',
     "calc_mass_balance": '稳态无反应混合衡算。arguments={"streams":[{"flow_kg_h":100,"mass_fraction":0.05},{"flow_kg_h":400,"mass_fraction":0}]}。质量分数必须在0..1，百分数5%写0.05；纯水中盐分数为0。禁止将摩尔分数当质量分数。返回 total_flow_kg_h、component_flow_kg_h、mass_fraction。',

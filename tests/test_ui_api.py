@@ -122,6 +122,8 @@ def test_bootstrap_cookie_knowledge_and_no_model_request(app, monkeypatch):
         assert bootstrap["examples"] == [{"title": "热负荷", "question": "如何计算显热？"}]
         assert bootstrap["session"]["runs"] == []
         assert bootstrap["knowledge"][0]["doc_id"] == "heat"
+        assert bootstrap["index_status"]["state"] == "missing"
+        assert bootstrap["index_status"]["backend"] == "lexical"
         card = client.get("/api/knowledge/heat")
         assert card.status_code == 200
         assert "质量流量" in card.json()["text"]

@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from chem_agent import __version__
 from chem_agent.agent import run_task
 from chem_agent.config import Settings
-from chem_agent.knowledge import KnowledgeBase
+from chem_agent.retrieval import HybridRetriever
 from chem_agent.trace import RunTrace, redact, utc_now
 
 COOKIE_NAME = "chem_session"
@@ -80,7 +80,7 @@ class _Session:
 class _Runtime:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.knowledge = KnowledgeBase(settings.knowledge_dir)
+        self.knowledge = HybridRetriever(settings)
         self.lock = threading.RLock()
         self.sessions: dict[str, _Session] = {}
         self.active_job_id: str | None = None
@@ -432,6 +432,7 @@ def create_app(settings: Settings) -> FastAPI:
                 for e in examples
             ],
             "knowledge": inventory,
+            "index_status": runtime.knowledge.index_status,
             "session": runtime.session_view(request.state.chem_session),
         }
 

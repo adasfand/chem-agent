@@ -261,3 +261,102 @@ test("metric cards round to six significant digits", () => {
   const h = harness();
   assert.equal(h.run("numeric(46.4444444444)"), "46.4444");
 });
+
+test("path view shows only returned retrieval relations and actual tool references", () => {
+  const h = harness();
+  const value = job(A, true);
+  value.result.citations = ["chunk-1"];
+  value.result.plan = [
+    {step_id:"s1", goal:"检索热量关系", tool_name:"search_knowledge", depends_on:[], status:"succeeded"},
+    {step_id:"s2", goal:"核对单位", tool_name:"convert_units", depends_on:["s1"], status:"succeeded"},
+  ];
+  value.result.calls = [
+    {
+      step_id:"s1", tool_name:"search_knowledge", status:"succeeded", arguments:{query:"显热负荷"},
+      output:{
+        hits:[{chunk_id:"chunk-1", title:"显热", text:"# 显热\n## 公式与输入\n热负荷公式\n来源：https://example.org/heat", source:"https://example.org/heat"}],
+        retrieval:{
+          query:"显热负荷", mode:"mix", keywords:{high_level:["热量"],low_level:["比热"]},
+          entities:[{id:"heat",name:"显热",description:"显热说明<SEP>补充说明<SEP> 显热说明 <SEP> <img src=x>",source_ids:["chunk-1"]},{id:"cp",name:"比热",description:"比热说明"}],
+          relationships:[{source:"heat",target:"cp",description:"由比热参与计算",source_ids:["chunk-2","unresolved-id"]}],
+          chunks:[{chunk_id:"chunk-1",title:"显热",text:"# 显热\n## 公式与输入\n热负荷公式\n来源：https://example.org/heat",source:"https://example.org/heat"}],
+          references:[{chunk_id:"chunk-1",source:"https://example.org/heat"}],
+          graph_sources:[
+            {chunk_id:"chunk-1",title:"显热图谱依据",source:"官方课程",url:"https://example.org/heat",text:"# 显热\n热负荷公式"},
+            {chunk_id:"chunk-2",title:"关系图谱依据",source:"本地资料",url:"javascript:alert(1)",text:"关系说明 <script>alert(1)</script>"},
+          ],
+        },
+      },
+    },
+    {
+      step_id:"s2", tool_name:"convert_units", status:"succeeded", input_refs:[{ref:"s1.value",argument:"value",value:2,unit:"kg/s"}],
+      output:{value:2,unit:"kg/s"},
+    },
+  ];
+  h.show(value);
+  h.run("selectView('path')");
+  const html = h.element("panel-content").innerHTML;
+  assert.match(html, /显热负荷/);
+  assert.match(html, /<line [^>]*class="graph-edge"/);
+  assert.match(html, /role="button" tabindex="0" aria-label="查看实体 显热"/);
+  assert.match(html, /显热说明/);
+  assert.match(html, /<ul class="entity-description-list"><li>显热说明<\/li><li>补充说明<\/li><li>&lt;img src=x&gt;<\/li><\/ul>/);
+  assert.doesNotMatch(html, /<SEP>/);
+  assert.doesNotMatch(html, /<img src=x>/);
+  assert.match(html, /实体支撑片段 · 1/);
+  assert.match(html, /显热图谱依据/);
+  assert.match(html, /同时命中/);
+  assert.match(html, /href="https:\/\/example.org\/heat"/);
+  assert.match(html, /关系支撑片段 · 2/);
+  assert.match(html, /关系图谱依据/);
+  assert.match(html, /图谱支撑 · 非命中/);
+  assert.match(html, /未解析来源/);
+  assert.match(html, /unresolved-id/);
+  assert.match(html, /全部图谱支撑资料 · 2 份/);
+  assert.match(html, /1 命中/);
+  assert.equal((html.match(/class="path-chunk(?: related)?"/g)||[]).length, 1);
+  assert.doesNotMatch(html, /href="javascript:/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(html, /class="path-chunk related"/);
+  assert.match(html, /<p>公式与输入 热负荷公式<\/p>/);
+  assert.doesNotMatch(html, /<p>[^<]*来源：/);
+  assert.doesNotMatch(html, /<p>[^<]*##/);
+  assert.match(html, /chunk-1/);
+  assert.match(html, /已引用/);
+  assert.match(html, /https:\/\/example.org\/heat/);
+  assert.match(html, /s1.value → value = 2 kg\/s/);
+  assert.match(html, /2 kg\/s/);
+  let prevented = false;
+  h.element("panel-content").events.keydown({
+    key:"Enter", preventDefault(){prevented=true;},
+    target:{closest:()=>({dataset:{queryIndex:"0",entityIndex:"1"}})},
+  });
+  assert.equal(prevented, true);
+  assert.match(h.element("panel-content").innerHTML, /比热说明/);
+  assert.match(h.element("panel-content").innerHTML, /该实体没有明确关联到本轮命中片段/);
+  assert.match(h.element("panel-content").innerHTML, /图谱未返回来源编号/);
+});
+
+test("path view does not invent graph entities for a plain hit and escapes source content", () => {
+  const h = harness();
+  const value = job(A, true);
+  value.result.calls = [{
+    step_id:"s1", tool_name:"search_knowledge", status:"succeeded", arguments:{query:"热量"},
+    output:{hits:[{chunk_id:"c1",title:"<img src=x>",text:"内容",source:"javascript:alert(1)"}]},
+  }];
+  h.show(value);
+  h.run("selectView('path')");
+  const html = h.element("panel-content").innerHTML;
+  assert.match(html, /没有返回可展示的实体/);
+  assert.doesNotMatch(html, /class="graph-edge"/);
+  assert.match(html, /&lt;img src=x&gt;/);
+  assert.doesNotMatch(html, /href="javascript:/);
+});
+
+test("index status distinguishes ready graph index from lexical fallback", () => {
+  const h = harness();
+  h.run("renderIndexStatus({state:'ready',backend:'lightrag',document_count:20,chunk_count:80,message:'ok'})");
+  assert.match(h.element("index-status").textContent, /LightRAG 图谱索引就绪 · 20 份资料 · 80 个片段/);
+  h.run("renderIndexStatus({state:'missing',backend:'lexical',message:'尚未构建索引'})");
+  assert.match(h.element("index-status").textContent, /尚未构建索引.*词法检索降级/);
+});

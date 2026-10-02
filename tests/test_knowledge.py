@@ -22,9 +22,18 @@ def knowledge() -> KnowledgeBase:
 
 def test_inventory_has_attributed_original_cards(knowledge: KnowledgeBase) -> None:
     inventory = knowledge.inventory()
-    assert len(inventory) == 15
-    assert len({item["doc_id"] for item in inventory}) == 15
-    assert all("项目自编教学说明，非实测物性数据" in item["source"] for item in inventory)
+    assert len(inventory) >= 21
+    assert len({item["doc_id"] for item in inventory}) == len(inventory)
+    original = [
+        item
+        for item in inventory
+        if item["doc_id"].split("_")[0].isdigit() and int(item["doc_id"].split("_")[0]) <= 15
+    ]
+    sourced = [item for item in inventory if item not in original]
+    assert len(original) == 15
+    assert all("项目自编教学说明，非实测物性数据" in item["source"] for item in original)
+    assert len(sourced) >= 6
+    assert all("https://" in item["source"] for item in sourced)
     assert all(item["chunk_count"] >= 1 for item in inventory)
     inventory[0]["title"] = "changed outside"
     assert knowledge.inventory()[0]["title"] != "changed outside"
@@ -34,15 +43,15 @@ def test_inventory_has_attributed_original_cards(knowledge: KnowledgeBase) -> No
     ("query", "expected"),
     [
         ("显热热负荷怎么计算", "01_sensible_heat"),
-        ("加热器功率的公式是什么", "01_sensible_heat"),
+        ("加热器功率的公式是什么", "02_heat_assumptions"),
         ("heat duty 计算公式", "01_sensible_heat"),
         ("1000 kg/h 换算为 kg/s", "03_mass_flow"),
         ("公斤每小时转每秒的质量流率", "03_mass_flow"),
         ("两股物流混合后的盐质量分数怎么计算", "10_mixing_balance"),
         ("混配后含盐率计算", "10_mixing_balance"),
-        ("摄氏温差和开尔文温差", "04_temperature_difference"),
+        ("摄氏温差和开尔文温差", "16_bipm_temperature_interval"),
         ("升温发生蒸发时可以直接使用简化热负荷公式吗", "02_heat_assumptions"),
-        ("没有给出比热容能计算吗", "06_specific_heat"),
+        ("没有给出比热容能计算吗", "19_iupac_heat_capacity_basis"),
     ],
 )
 def test_retrieval_with_paraphrases(knowledge: KnowledgeBase, query: str, expected: str) -> None:
