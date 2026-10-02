@@ -1,0 +1,127 @@
+{
+  "version": "0.2.0",
+  "verified_on": "2026-10-02",
+  "platform": "macOS",
+  "python": "3.12.14",
+  "node_for_optional_dev_checks": "24.19.0",
+  "offline": {
+    "pytest": {
+      "passed": 157,
+      "failed": 0,
+      "warnings": [
+        "Starlette TestClient uses deprecated AnyIO BlockingPortal alias; runtime tests pass"
+      ]
+    },
+    "node_state_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "javascript_syntax": "passed"
+  },
+  "clean_install": {
+    "source_archive": true,
+    "separate_directory_and_venv": true,
+    "uv_sync_locked": "passed",
+    "credentials_configured": false,
+    "doctor": "passed",
+    "knowledge_cards": 15,
+    "index": "passed",
+    "pytest_passed": 157,
+    "api_and_static_asset_smoke": "passed",
+    "wheel_includes_web_assets": true,
+    "windows": "not tested"
+  },
+  "live": {
+    "provider": "DeepSeek",
+    "model": "deepseek-v4-pro",
+    "mode": "actual_network_calls",
+    "cases": [
+      {
+        "name": "missing_specific_heat",
+        "run_id": "20261002T085857-8f6a1e4df1",
+        "status": "needs_input",
+        "assertions": [
+          "no successful heat calculation"
+        ]
+      },
+      {
+        "name": "follow_up",
+        "run_id": "20261002T085908-f380cc8622",
+        "parent_run_id": "20261002T085857-8f6a1e4df1",
+        "status": "completed",
+        "heat_duty_kw": 46.44444444444444,
+        "assertions": [
+          "history includes original question",
+          "actual s2.value reference",
+          "citations point to retrieved chunks"
+        ]
+      },
+      {
+        "name": "final_build_heat",
+        "run_id": "20261002T090531-abe3bc609c",
+        "status": "completed",
+        "heat_duty_kw": 46.44444444444444,
+        "assertions": [
+          "fresh service after final code changes",
+          "s2.value dependency",
+          "sample button and submit control activated in browser"
+        ]
+      }
+    ],
+    "model_requests_succeeded": 9
+  },
+  "browser": {
+    "surface": "Codex in-app browser",
+    "interaction": "keyboard entry and control activation",
+    "checks": [
+      "sample fills input",
+      "missing input then follow-up",
+      "summary/steps/evidence tabs",
+      "expand actual input/output",
+      "offline knowledge browsing",
+      "Markdown download",
+      "JSON download",
+      "same-service refresh restores task",
+      "restart resets UI session without deleting runs"
+    ],
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 852,
+        "page_scroll_width": 1440,
+        "page_scroll_height": 852
+      },
+      {
+        "width": 662,
+        "height": 745,
+        "page_scroll_width": 662,
+        "page_scroll_height": 745
+      },
+      {
+        "width": 390,
+        "height": 796,
+        "page_scroll_width": 390,
+        "page_scroll_height": 796
+      }
+    ],
+    "input_and_result_visible": true,
+    "screenshots": [
+      "workbench.png",
+      "evidence.png"
+    ],
+    "screenshot_limits": "Only default-window screenshots retained; viewport overrides were checked through DOM geometry, not physical mobile hardware."
+  },
+  "sample_report": {
+    "file": "sample-report.md",
+    "source_run_id": "20261002T085908-f380cc8622",
+    "generated_from_existing_trace": true,
+    "additional_model_calls": false
+  },
+  "limits": [
+    "Single local service process; no production multi-user deployment tested",
+    "Model explanation is not fully machine-verified against every original user condition",
+    "Cancellation waits for an already-issued request to return or time out"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "date": "2026-09-29",
+  "python": "3.12.14",
+  "platform": "Darwin arm64",
+  "offline_tests": {
+    "passed": 116,
+    "failed": 0
+  },
+  "ruff": "passed",
+  "live_cases": {
+    "passed": 8,
+    "failed": 0
+  },
+  "ui_browser": {
+    "heat_duty_kw": 46.44,
+    "steps": [
+      "search_knowledge",
+      "convert_units",
+      "calc_heat_duty"
+    ],
+    "status": "completed",
+    "screenshot": "../ui-preview.png"
+  },
+  "clean_install": {
+    "fresh_directory": true,
+    "separate_venv": true,
+    "uv_sync_locked": "passed",
+    "credentials_configured": false,
+    "offline_tests_passed": 116,
+    "index": "passed",
+    "http_status": 200,
+    "model_requests": 0
+  },
+  "limitations": [
+    "未验证Windows",
+    "未验证完全离线模型",
+    "未验证生产多人部署"
+  ]
+}

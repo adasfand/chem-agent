@@ -1,90 +1,106 @@
-# chem-agent：化工知识增强与工具调用
+# 化工知识与计算助手
 
-开发骨架，采用 Python 3.11、smolagents ToolCallingAgent、本地字符 TF-IDF、Pint 和 Gradio。
-按照两份需求 MD 的后续选型报告实施：通用 Agent 循环交给 smolagents，项目实现资料、领域工具、计划约束和真实调用记录。
+一个可本机运行、可移交源码的教学演示系统：从 15 张化工知识卡检索依据，调用固定计算工具，并保留计划、参数、结果和来源。`0.2.0` 使用浏览器工作台；桌面视图中输入与结果并排显示，长内容在面板内滚动，无需到页面底部寻找答复。
 
-**当前证据等级：源码已编写、仅静态审查。未安装项目依赖、未导入或运行本项目、未调用模型、未运行测试。**
-环境文件是拟用配置，不是经过服务器验证的依赖锁。`completed` 仅表示一次程序流程完成；`acceptance_status=not_evaluated` 表示没有据此认定通过验收。
+## 能做什么
 
-## 1. 当前内容
+- **知识问答**：检索原文、来源和片段编号；相关性不足时说明资料不足。
+- **单位换算**：常用质量、体积、流量、压力、温度及温差，拒绝不兼容量纲。
+- **显热热负荷**：使用明确给出的质量流量、比热和温差，保留前序换算结果的真实引用。
+- **混合衡算**：计算稳态、无反应混合物流的总质量流量及同一组分质量分数。
+- **补充参数与导出**：在原任务上下文中补充数据，生成关联的新运行；导出 Markdown 报告和 JSON 记录。
 
-- 两个业务入口：`ask` 知识问答，`task` 多工具任务；均调用同一个服务层。
-- 15 张自编教学知识卡，Markdown/TXT 读取、标题/段落分段、可重建 JSON 索引快照与来源追溯。
-- 四个业务工具：`search_knowledge`、`convert_units`、`calc_heat_duty`、`calc_mass_balance`。
-- 一个计划管理工具 `record_plan`，补充结构化步骤和依赖；它不是第五个化工业务工具。
-- 显式引用解析：如 `s2.value` 由程序读取成功步骤 s2 的返回字段，覆盖模型自行填写的对应参数。
-- 每次任务独立 Agent、计划和 JSONL 记录；模型收到的消息也记录，便于核对知识片段是否进入上下文。
-- 命令行、Gradio 页面、三个示例、必要测试源码和验收/研究报告模板。
+资料均为项目自编教学说明，非实测物性。相变、反应热、复杂流程模拟和真实物性查询不在当前范围内。
 
-## 2. 目录
+## 安装与启动
+
+需要 Python 3.11–3.13、`uv`；本机使用 Python 3.12。未安装 uv 时可运行 `python -m pip install uv`。首次安装依赖和调用模型需要联网。解压后在含 `pyproject.toml` 的目录执行：
+
+```bash
+uv sync --locked
+cp .env.example .env
+```
+
+Windows PowerShell 将复制命令改为 `Copy-Item .env.example .env`。编辑本机 `.env`，选择一种密钥配置方式：
+
+```dotenv
+DEEPSEEK_API_KEY=填写自己的密钥
+# 或保持上项为空，使用只存放密钥字符串的本机文本文件：
+# DEEPSEEK_API_KEY_FILE=/absolute/path/to/your-key.txt
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-pro
+CHEM_PORT=7865
+```
+
+环境变量优先于 `.env`；直接设置的密钥优先于密钥文件。交付包不含可用密钥，接收方需配置自己的账号。
+
+```bash
+uv run chem-agent doctor
+uv run chem-agent ui
+```
+
+按上述配置打开 `http://127.0.0.1:7865`；程序默认端口为 `7860`。端口冲突时修改 `CHEM_PORT`。也可用 `./start.sh`（macOS/Linux）或 `start.bat`（Windows）。前端为原生 HTML/CSS/JavaScript，由 FastAPI/uvicorn 提供页面和接口，无需 Node 或前端构建。启动时保持一个服务进程。
+
+## 工作台操作
+
+1. 选择示例或输入问题，点击“运行”（或 Ctrl/⌘ + Enter）。输入区和结果区保持在同一工作台内。
+2. 在“结论”查看工具数值与模型说明；切换“过程”“依据”核对参数、引用和原文。数值卡取自成功工具输出。
+3. 状态为“等待补充”时输入数据并点击“继续”。系统创建关联的新运行，按当前会话上下文重新规划；不恢复旧执行器。
+4. 点击“停止”取消当前任务，待其结束后可“新建任务”。完成、缺参、资料不足、超范围、失败或取消的记录均可查看和导出。新建任务清空当前任务上下文，通过左侧任务记录可重新查看已结束的运行。
+
+热负荷示例：`1000 kg/h`、`25→65 °C`、给定比热 `4.18 kJ/(kg·K)`，结果约 `46.44 kW`；流量改为 `2000 kg/h` 后约 `92.89 kW`。
+
+同一浏览器会话通过 Cookie 关联，刷新页面可恢复服务内存中的当前状态。界面每个会话保留最近最多 40 轮，非活动会话闲置 24 小时后过期；服务重启后会话和界面历史不恢复，原始 `runs/` 文件仍保留。整个服务同时处理一个模型任务，忙时再次提交会提示稍后重试。当前面向本机演示，未验证生产多人部署。
+
+取消会阻止后续工具调用；已经发出的模型请求可能等待返回或超时，其响应不会继续触发工具。单次请求超时默认 60 秒，可用 `CHEM_REQUEST_TIMEOUT` 调整。失败或取消前已经成功的步骤保留供复核，不表示整个任务成功。
+
+## 常用命令
+
+在项目根目录运行。`doctor`、`index`、`search` 和默认测试不调用模型。
+
+| 命令 | 用途 |
+| --- | --- |
+| `uv run chem-agent doctor` | 检查 Python、资料数量和密钥是否配置；不验证远端认证或余额 |
+| `uv run chem-agent index` | 重建资料索引并写入 `build/knowledge_manifest.json` |
+| `uv run chem-agent search "显热热负荷计算"` | 离线检索知识卡 |
+| `uv run chem-agent run "请将2.5 MPa换算成kPa。"` | 调用实际模型执行任务，消耗 API 额度 |
+| `uv run chem-agent ui` | 启动本机工作台 |
+| `uv run pytest` | 运行离线回归测试 |
+| `node --test tests/frontend_state.test.cjs` | 可选前端状态回归；已使用 Node 24 验证，运行系统本身不需要 Node |
+| `uv run python scripts/validate_live.py` | 重新执行 8 个真实模型案例，消耗 API 额度 |
+| `uv run python scripts/package.py` | 生成 `dist/chem-agent-demo-0.2.0.zip` |
+
+命令行补参时，用前一结果的 `run_id` 替换 `RUN_ID`；指定记录须存在于本机 `runs/`：
+
+```bash
+uv run chem-agent run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热损失。" --follow-up RUN_ID
+```
+
+## 运行记录与维护
+
+- **Markdown 报告**：用于阅读和移交，包含问题、答复、成功工具数值、执行计划、来源摘录和适用条件；不会额外请求模型。
+- **JSON 记录**：用于详细复核，包含实际参数、结果引用、工具输出、状态和请求中的工具观察。每轮原始记录写入 `runs/<run_id>.json`。
+
+模型请求证据省略私密推理，已知密钥会脱敏。记录仍可能含用户输入及业务数据，分享前应检查；脱敏不等于自动识别全部敏感业务信息。
 
 ```text
-chem-agent/
-  app.py                       Gradio 页面
-  cli.py                       CLI 入口
-  environment.yml              服务器 Conda 环境草案
-  pyproject.toml               包和候选依赖
-  .env.example                 无密钥配置模板
-  src/chem_agent/
-    config.py                  配置与范围检查
-    knowledge.py               资料、分段、TF-IDF、索引快照
-    tools.py                   固定公式、Pydantic 输入、Pint 换算
-    execution.py               计划管理、引用解析、状态与引用检查
-    trace.py                   每次运行的 JSON/JSONL
-    model.py                   模型适配和请求证据
-    agent.py                   框架与领域工具装配
-    service.py                 两个入口的统一业务服务
-    cli.py                     CLI 子命令
-  data/knowledge/              自编示例知识卡
-  examples/tasks.json          三个任务与理论参考值
-  tests/                      待服务器执行的测试源码
-  docs/                       规划、验收矩阵、服务器说明和报告模板
+src/chem_agent/       模型、执行器、计算、检索、API 与报告导出
+src/chem_agent/web/   浏览器工作台 HTML/CSS/JavaScript
+data/knowledge/      可编辑的 Markdown 教学知识卡
+examples/tasks.json  演示及真实验证题目
+tests/               离线回归测试
+scripts/             真实验证和白名单打包
+docs/validation/     随包提供的验证证据
 ```
 
-## 3. 服务器准备（后续执行，本机无需安装）
+知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改后新任务从源文件重建索引；运行 `index` 更新资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。交付包排除 `.env`、`.venv`、`.local` 和原始 `runs/`。
 
-先完成 GitHub 网页建库和协作权限，再根据实际服务器路径设置远端及上传；详见 `docs/GITHUB_UI.md`。
-等代码到服务器后，在项目根目录执行以下候选命令：
+## 验证范围
 
-```bash
-conda env create -f environment.yml
-conda activate chem-agent
-cp .env.example .env
-# 编辑 .env，填入真实模型名、服务 /v1 地址和密钥。
-python cli.py build-index
-python cli.py search "单相显热公式与适用条件"
-python cli.py example A
-python cli.py example B
-python cli.py example C
-python app.py
-```
+`0.2.0` 已通过 **157 项 Python 离线测试、12 项前端状态测试**及 Ruff 检查。2026-10-02 在工作台发起三轮真实 DeepSeek 任务：缺参、补参和独立热负荷；两次计算均得到 **46.44 kW**。共 9 次模型请求成功，保留补参关联和换算结果引用。
 
-模型服务必须实际支持工具调用，不能仅因声称 API 兼容就认为协议已通过。服务器不需要为了本工程训练模型；使用现成 API 时检索和计算在 CPU 上执行。尚未测量运行时间或内存。
-默认 UI 监听 `127.0.0.1:7860`，服务器访问方式待部署时配置 SSH 转发。若修改监听地址，应另行配置访问控制。
-环境变量优先于 `.env`；CLI 默认从当前目录读取配置，也可 `python cli.py --root /path/to/chem-agent ...`。
+浏览器已验证补参、标签切换、工具输入输出、资料浏览、Markdown/JSON 下载及刷新恢复。布局尺寸检查覆盖 `1440×852`、`662×745`、`390×796`，DOM 测量确认根页面未溢出，输入与结果区在视口内。独立解压复装通过：锁定依赖、无密钥环境检查、15 卡索引、157 项测试及页面资源/API 检查；wheel 含全部静态资源。
 
-## 4. 命令和运行证据
+详见[检查记录](docs/validation/v0.2.0/checks.json)、[技术与验证报告](docs/技术与验证报告.md)及[工作台截图](docs/validation/v0.2.0/workbench.png)。旧版 8 个模型案例单独保留作历史记录。
 
-```bash
-python cli.py ask "定压比热与热负荷有什么关系？简化计算需要哪些条件？"
-python cli.py task "将1000 kg/h换算为kg/s"
-python -m pytest
-python -m pip freeze > requirements-server.lock.txt
-```
-
-以上均为服务器阶段命令，尚未执行。通过部署和用例检查后才保存依赖快照，并在干净 Conda 环境重新安装复核。依赖快照不自动代表跨平台锁定。
-
-运行目录 `runs/<run_id>/`：
-
-- `events.jsonl`：问题、配置摘要、资料哈希、计划版本、工具起止/参数/结果/错误、模型请求与响应。
-- `result.json`：最终状态、答案、计划、步骤状态、输出及引用。
-
-模型请求日志含任务和检索原文，默认不进入 Git；密钥和 API 地址会脱敏。日志不应直接当作可公开材料。
-知识卡改动后索引加载会拒绝旧快照，需要重新 `build-index`。索引保存文本与元数据，TF-IDF 矩阵在加载时重建，适用于首版小语料。
-
-## 5. 语义边界与后续工作
-
-当前实现对 ID、依赖、数值范围、引用成员关系进行程序检查。`user:` 输入依据仍由模型声明，需人工核对是否来自题设；引用存在不代表引用支持了整句结论，最终数值与适用条件也要在服务器案例中核对。
-主流程使用框架真实工具调用；没有模拟模型或预写答案兜底。检索不到资料时应解释证据不足；缺少比热等参数时应请求补充。模型对这些要求的遵循尚待实际验证。
-知识卡是自编教学说明，不是工艺设计规范或实测物性库；PDF/OCR、外部数据库和模型训练未列入首版实现。
-研究报告目前是待填模板，最终需写入真实记录和验证结果。完整顺序见 `docs/IMPLEMENTATION_PLAN.md`，逐项对应见 `docs/ACCEPTANCE.md`。
+未验证 Windows、完全离线模型、生产多人部署及未收录主题的准确率。工具输入仍需与用户给定参数核对。
