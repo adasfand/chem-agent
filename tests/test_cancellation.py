@@ -49,7 +49,9 @@ def test_pre_cancelled_task_never_initializes_model(settings):
     assert result["status"] == "cancelled"
     assert result["calls"] == []
     assert result["model_requests"] == []
-    saved = json.loads(settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text())
+    saved = json.loads(
+        settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text(encoding="utf-8")
+    )
     assert saved["status"] == "cancelled"
 
 

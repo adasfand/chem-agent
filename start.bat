@@ -1,17 +1,14 @@
 @echo off
 cd /d "%~dp0"
 if not exist .env copy .env.example .env >nul
-if exist .venv\Scripts\python.exe (
-  .venv\Scripts\python.exe app.py
-) else (
-  where uv >nul 2>nul
-  if errorlevel 1 (
-    echo Install Python 3.11-3.13 and uv, then run: uv sync --locked
-    pause
-    exit /b 1
-  )
-  uv sync --locked --no-dev
-  if errorlevel 1 exit /b 1
-  uv run --no-sync python app.py
+where conda >nul 2>nul
+if errorlevel 1 (
+  echo Open an Anaconda Prompt, then run this script again.
+  echo Required environment: chem-agent
+  pause
+  exit /b 1
 )
+call conda run --no-capture-output -n chem-agent python app.py
+set "CHEM_EXIT_CODE=%ERRORLEVEL%"
 pause
+exit /b %CHEM_EXIT_CODE%

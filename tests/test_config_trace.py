@@ -22,7 +22,7 @@ def test_trace_redacts_nested_credentials(tmp_path):
     trace = RunTrace(tmp_path, f"用户输入{secret}", {}, "v1", (secret,))
     trace.data["calls"].append({"arguments": {"api_key": "other", "text": secret}})
     trace.finish("failed", "sk-abcdefghijklmnop")
-    text = trace.path.read_text()
+    text = trace.path.read_text(encoding="utf-8")
     assert secret not in text
     assert "sk-abcdefghijklmnop" not in text
     assert json.loads(text)["calls"][0]["arguments"]["api_key"] == "[redacted]"

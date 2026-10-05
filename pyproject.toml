@@ -25,6 +25,11 @@ dev = ["pytest>=8.3,<9", "ruff>=0.12,<0.14", "httpx>=0.28,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chem_agent"]
+exclude = ["src/chem_agent/web"]
+skip-excluded-dirs = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"THIRD_PARTY_NOTICES.md" = "chem_agent/THIRD_PARTY_NOTICES.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

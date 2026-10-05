@@ -1,4 +1,4 @@
-"""Local FastAPI workbench with isolated sessions and one visible model slot."""
+"""FastAPI service with isolated sessions and one model execution slot."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 from dotenv import dotenv_values
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from chem_agent import __version__
@@ -31,7 +31,6 @@ COOKIE_NAME = "chem_session"
 SESSION_TTL = 24 * 60 * 60
 MAX_SESSIONS = 128
 MAX_SESSION_RUNS = 40
-WEB_DIR = Path(__file__).parent / "web"
 TERMINAL_STATUSES = {
     "completed",
     "needs_input",
@@ -407,19 +406,12 @@ def create_app(settings: Settings) -> FastAPI:
             status_code=422,
         )
 
-    @app.get("/")
-    def index():
-        path = WEB_DIR / "index.html"
-        if not path.is_file():
-            raise HTTPException(503, "页面资源尚未就绪。")
-        return FileResponse(path, media_type="text/html")
-
-    @app.get("/static/{name}")
-    def static_file(name: str):
-        types = {"style.css": "text/css", "app.js": "application/javascript"}
-        if name not in types or not (WEB_DIR / name).is_file():
-            raise HTTPException(404, "资源不存在。")
-        return FileResponse(WEB_DIR / name, media_type=types[name])
+    @app.get("/api/health")
+    def health():
+        return {
+            "status": "ok",
+            "version": __version__,
+        }
 
     @app.get("/api/bootstrap")
     def bootstrap(request: Request):

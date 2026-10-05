@@ -140,7 +140,9 @@ def test_agent_completes_real_tool_chain_and_observes_results(settings):
     assert "heat_duty_kw" in repr(created[0].received[4])
     assert created[0].client.closed
     assert any(item["calls"] for item in progress)
-    persisted = json.loads(settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text())
+    persisted = json.loads(
+        settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text(encoding="utf-8")
+    )
     assert persisted["status"] == "completed"
 
 

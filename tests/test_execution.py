@@ -46,7 +46,7 @@ def test_real_result_is_resolved_and_persisted(execution):
     assert call["input_refs"][0]["value"] == pytest.approx(2000 / 3600)
     assert call["input_refs"][0]["unit"] == "kg/s"
     execution.complete("热负荷92.89 kW，恒比热且无相变。", "completed", [])
-    persisted = json.loads(execution.trace.path.read_text())
+    persisted = json.loads(execution.trace.path.read_text(encoding="utf-8"))
     assert persisted["status"] == "completed"
     assert persisted["calls"][-1]["requested_arguments"]["mass_flow_kg_s"] == {"$ref": "s1.value"}
 

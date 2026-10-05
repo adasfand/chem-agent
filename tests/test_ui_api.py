@@ -199,7 +199,7 @@ def test_follow_up_uses_server_history_and_persists_parent_id(app, runner):
         assert runner[1]["history"][1]["role"] == "assistant"
         assert second["result"]["parent_run_id"] == first["result"]["run_id"]
         saved_path = app.state.runtime.settings.runs_dir / f"{second['result']['run_id']}.json"
-        saved = json.loads(saved_path.read_text())
+        saved = json.loads(saved_path.read_text(encoding="utf-8"))
         assert saved["parent_run_id"] == first["result"]["run_id"]
         independent = run_one(client, "独立问题")
         assert runner[-1]["history"] == []
@@ -334,3 +334,32 @@ def test_session_run_count_is_bounded(app, runner, monkeypatch):
         assert len(session["runs"]) == 2
         assert session["runs"][0]["job_id"] == third["job_id"]
         assert client.get(f"/api/jobs/{first['job_id']}").status_code == 404
+
+
+def test_api_service_health_and_bootstrap(app):
+    with client_for(app) as client:
+        health = client.get("/api/health")
+        assert health.status_code == 200
+        assert health.json() == {"status": "ok", "version": ui.__version__}
+        assert client.get("/api/bootstrap").status_code == 200
+
+
+def test_backend_does_not_serve_frontend_files(app):
+    with client_for(app) as client:
+        for path in (
+            "/",
+            "/index.html",
+            "/assets/index-123.js",
+            "/assets/index-123.css",
+            "/app.js",
+            "/style.css",
+            "/src/main.ts",
+            "/package.json",
+            "/node_modules/vue/package.json",
+            "/assets/.env",
+            "/assets/%2E%2E%2F%2E%2E%2Fpackage.json",
+            "/assets/%2E%2E%5C%2E%2E%5Cpackage.json",
+        ):
+            response = client.get(path)
+            assert response.status_code == 404, path
+            assert response.headers["content-type"].startswith("application/json"), path

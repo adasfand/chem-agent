@@ -1,6 +1,6 @@
 # 化工知识与计算助手
 
-一个可本机运行、可移交源码的教学演示系统：从 15 张化工知识卡检索依据，调用固定计算工具，并保留计划、参数、结果和来源。`0.2.0` 使用浏览器工作台；桌面视图中输入与结果并排显示，长内容在面板内滚动，无需到页面底部寻找答复。
+一个可本机运行、可移交源码的教学演示系统：从 15 张化工知识卡检索依据，调用固定计算工具，并保留计划、参数、结果和来源。前端使用 Vue 3、TypeScript 和 Vite，后端使用 FastAPI 与 smolagents；前后端分别启动，前端通过 `/api` 代理访问后端服务。当前为 Vue 前端改造的开发版本，前端包版本独立于后端 `0.2.0`，尚不代表正式合同验收完成。
 
 ## 能做什么
 
@@ -14,14 +14,18 @@
 
 ## 安装与启动
 
-需要 Python 3.11–3.13、`uv`；本机使用 Python 3.12。未安装 uv 时可运行 `python -m pip install uv`。首次安装依赖和调用模型需要联网。解压后在含 `pyproject.toml` 的目录执行：
+后端使用名为 `chem-agent` 的 Conda 环境，Python 3.12；`uv.lock` 锁定 Python 依赖。以下是 Windows PowerShell 首次安装命令，在含 `pyproject.toml` 的项目根目录执行。已有环境时跳过创建：
 
-```bash
-uv sync --locked
-cp .env.example .env
+```powershell
+conda create -n chem-agent python=3.12 pip -y
+conda activate chem-agent
+uv export --locked --format requirements-txt --no-emit-project --output-file "$env:TEMP\chem-agent-requirements.txt" > $null
+python -m pip install -r "$env:TEMP\chem-agent-requirements.txt"
+python -m pip install --no-deps -e .
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Windows PowerShell 将复制命令改为 `Copy-Item .env.example .env`。编辑本机 `.env`，选择一种密钥配置方式：
+使用本机已有 Conda、uv 和 Node，不安装全局 npm 组件。前端依赖及安装目录全部位于 `src/chem_agent/web/`，首次安装依赖需要联网。编辑根目录 `.env`，选择一种密钥配置方式：
 
 ```dotenv
 DEEPSEEK_API_KEY=填写自己的密钥
@@ -29,17 +33,30 @@ DEEPSEEK_API_KEY=填写自己的密钥
 # DEEPSEEK_API_KEY_FILE=/absolute/path/to/your-key.txt
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-pro
-CHEM_PORT=7865
+CHEM_PORT=7860
 ```
 
 环境变量优先于 `.env`；直接设置的密钥优先于密钥文件。交付包不含可用密钥，接收方需配置自己的账号。
 
-```bash
-uv run chem-agent doctor
-uv run chem-agent ui
+```powershell
+conda activate chem-agent
+python cli.py doctor
+python app.py
 ```
 
-按上述配置打开 `http://127.0.0.1:7865`；程序默认端口为 `7860`。端口冲突时修改 `CHEM_PORT`。也可用 `./start.sh`（macOS/Linux）或 `start.bat`（Windows）。前端为原生 HTML/CSS/JavaScript，由 FastAPI/uvicorn 提供页面和接口，无需 Node 或前端构建。启动时保持一个服务进程。
+后端 API 默认监听 `http://127.0.0.1:7860`，健康检查地址为 `http://127.0.0.1:7860/api/health`。`doctor` 仅检查配置，不验证模型认证或余额。也可用 `start.bat`（Windows）或 `./start.sh`（macOS/Linux）；脚本使用同名 Conda 环境，不自动安装依赖。PyCharm 解释器应指向该环境的 `python.exe`。
+
+保持后端终端运行，另开终端启动前端（本机已安装依赖，可直接执行 `npm run dev`）：
+
+```powershell
+Set-Location "E:\Python PyCharm\chem-agent\src\chem_agent\web"
+# 首次安装或 package-lock.json 更新后执行 npm ci
+npm run dev
+```
+
+打开 `http://127.0.0.1:5173`，Vite 将 `/api` 请求代理到 `127.0.0.1:7860`；使用这两个一致的本机地址。改动后端端口时同步修改 `web/vite.config.ts` 中的代理目标。Node 版本要求见 `web/package.json` 的 `engines` 字段。所有前端代码、测试、配置、锁文件和 `node_modules` 都保留在 `web/` 中。
+
+日常启动使用后端 `python app.py` 和前端 `npm run dev` 两个终端，页面入口为 `http://127.0.0.1:5173`。需要检查前端编译产物时，在 `web/` 运行 `npm run build`，再运行 `npm run preview`，打开 `http://127.0.0.1:4173`；预览服务同样代理 `/api` 到后端，仅用于本机检查。页面脚本、样式和图标均由前端提供，不从 CDN 加载。DeepSeek 推理仍需联网和有效密钥。
 
 ## 工作台操作
 
@@ -60,20 +77,22 @@ uv run chem-agent ui
 
 | 命令 | 用途 |
 | --- | --- |
-| `uv run chem-agent doctor` | 检查 Python、资料数量和密钥是否配置；不验证远端认证或余额 |
-| `uv run chem-agent index` | 重建资料索引并写入 `build/knowledge_manifest.json` |
-| `uv run chem-agent search "显热热负荷计算"` | 离线检索知识卡 |
-| `uv run chem-agent run "请将2.5 MPa换算成kPa。"` | 调用实际模型执行任务，消耗 API 额度 |
-| `uv run chem-agent ui` | 启动本机工作台 |
-| `uv run pytest` | 运行离线回归测试 |
-| `node --test tests/frontend_state.test.cjs` | 可选前端状态回归；已使用 Node 24 验证，运行系统本身不需要 Node |
-| `uv run python scripts/validate_live.py` | 重新执行 8 个真实模型案例，消耗 API 额度 |
-| `uv run python scripts/package.py` | 生成 `dist/chem-agent-demo-0.2.0.zip` |
+| `python cli.py doctor` | 检查 Python、资料数量和密钥是否配置；不验证远端认证或余额 |
+| `python cli.py index` | 重建资料索引并写入 `build/knowledge_manifest.json` |
+| `python cli.py search "显热热负荷计算"` | 离线检索知识卡 |
+| `python cli.py run "请将2.5 MPa换算成kPa。"` | 调用实际模型执行任务，消耗 API 额度 |
+| `python app.py` | 启动本机后端 API 服务 |
+| `python -m pytest` | 运行离线 Python 回归测试 |
+| `npm run typecheck` / `npm run lint` / `npm run format:check` / `npm test` | 在 `web/` 执行前端类型、规范、Prettier 格式及 Vitest 检查 |
+| `npm run build` | 在 `web/` 编译交付页面到 `dist/` |
+| `python scripts/validate_live.py` | 重新执行 8 个真实模型案例，消耗 API 额度 |
+| `python scripts/package.py` | 打包源码、知识卡和前端项目；若已有前端构建产物则一并包含 |
+| `python scripts/package_frontend_dependencies.py` | 单独归档本机 Windows 前端依赖，供兼容环境离线开发 |
 
 命令行补参时，用前一结果的 `run_id` 替换 `RUN_ID`；指定记录须存在于本机 `runs/`：
 
 ```bash
-uv run chem-agent run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热损失。" --follow-up RUN_ID
+python cli.py run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热损失。" --follow-up RUN_ID
 ```
 
 ## 运行记录与维护
@@ -85,7 +104,10 @@ uv run chem-agent run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无
 
 ```text
 src/chem_agent/       模型、执行器、计算、检索、API 与报告导出
-src/chem_agent/web/   浏览器工作台 HTML/CSS/JavaScript
+src/chem_agent/web/   Vue / TypeScript 源码、配置、测试及 npm 锁文件
+  src/              前端组件、API 客户端、状态和样式
+  dist/             可离线提供的编译页面（构建生成）
+  node_modules/     本机前端开发依赖（安装生成）
 data/knowledge/      可编辑的 Markdown 教学知识卡
 examples/tasks.json  演示及真实验证题目
 tests/               离线回归测试
@@ -93,14 +115,26 @@ scripts/             真实验证和白名单打包
 docs/validation/     随包提供的验证证据
 ```
 
-知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改后新任务从源文件重建索引；运行 `index` 更新资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。交付包排除 `.env`、`.venv`、`.local` 和原始 `runs/`。
+知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改后新任务从源文件重建索引；运行 `index` 更新资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。
+
+源码交付包包含前端源码、`package-lock.json` 及已有的可选 `web/dist`，排除 `.env`、虚拟环境、`node_modules`、开发缓存、`.local` 和原始 `runs/`。Python wheel 仅分发后端 Python 包，前端项目通过源码 ZIP 单独提供。每个交付 ZIP 附带 SHA-256 文件。
+
+前端依赖包独立于源码包，包含本机 `node_modules`、npm 锁文件及平台清单，不包含 Node 安装程序。离线接收方需自行提供兼容 Node，核对相同 Windows/CPU 架构、Node 版本以及 `offline-dependencies.json` 中锁文件哈希后，再将依赖包中的 `node_modules` 解压到对应项目的 `web/`；不要覆盖不同版本项目的锁文件。使用 `npm run dev` 或 `npm run preview` 时需要前端 Node 环境与 `node_modules`。Python 离线安装环境不包含在这两个 ZIP 中。
 
 ## 验证范围
 
-`0.2.0` 已通过 **157 项 Python 离线测试、12 项前端状态测试**及 Ruff 检查。2026-10-02 在工作台发起三轮真实 DeepSeek 任务：缺参、补参和独立热负荷；两次计算均得到 **46.44 kW**。共 9 次模型请求成功，保留补参关联和换算结果引用。
+2026-10-05 完成 API 独立启动调整：25 项 API/打包回归测试及 Ruff 检查通过；实际启动后端 `7860` 和前端 `5173`，验证 Vue 页面、15 张知识卡、会话及代理校验正常，浏览器控制台无错误。后端页面与静态资源路由返回 404；Python wheel 已核对只包含后端包。本次未调用真实模型 API。
 
-浏览器已验证补参、标签切换、工具输入输出、资料浏览、Markdown/JSON 下载及刷新恢复。布局尺寸检查覆盖 `1440×852`、`662×745`、`390×796`，DOM 测量确认根页面未溢出，输入与结果区在视口内。独立解压复装通过：锁定依赖、无密钥环境检查、15 卡索引、157 项测试及页面资源/API 检查；wheel 含全部静态资源。
+2026-10-04 完成 Windows 本机检查：Conda `chem-agent` / Python 3.12.14。前后端分离阶段 **161 项 Python 测试**通过；随后界面优化阶段通过 **33 项前端测试、23 项后端 UI/API 回归测试**。TypeScript、ESLint、Prettier 及最新前端构建通过，Python 分离阶段 Ruff 检查通过。前端 8 项业务请求均与后端接口对应。浏览器通过离线测试模型驱动真实本地检索与计算工具，检查热负荷、前序结果引用、补参关联、取消、刷新恢复、知识卡浏览和两种导出；桌面、平板及手机尺寸无横向溢出，控制台无错误。最新源码 ZIP 已更新；独立前端依赖 ZIP 沿用已核验版本，依赖未变。详见[本轮检查记录](docs/validation/vue-local/checks.json)与[当前页面](docs/validation/vue-local/workbench.png)。
+
+界面优化保留重新连接时的输入草稿，后台标签页降低轮询频率，知识卡缓存合并重复请求并支持失败重试。工作台采用工程计算布局，区分公式示例与实际计算结果；平板与手机使用纵向布局，知识卡正文去除重复标题和来源。
+
+本轮未配置可用 DeepSeek Key，未发起真实模型请求。离线测试入口只在开发检查中临时使用，不属于正式应用的运行模式。
+
+以下为改造前 `0.2.0` 的历史验证记录，不代表当前 Vue 前端已通过真实模型验收：旧版通过 **157 项 Python 离线测试、12 项前端状态测试**及 Ruff 检查。2026-10-02 在旧工作台发起三轮真实 DeepSeek 任务：缺参、补参和独立热负荷；两次计算均得到 **46.44 kW**。共 9 次模型请求成功，保留补参关联和换算结果引用。
+
+旧版浏览器验证覆盖补参、标签切换、工具输入输出、资料浏览、Markdown/JSON 下载及刷新恢复。旧版布局尺寸检查覆盖 `1440×852`、`662×745`、`390×796`；独立解压复装检查覆盖锁定依赖、无密钥配置、15 卡索引、157 项测试及页面资源/API。
 
 详见[检查记录](docs/validation/v0.2.0/checks.json)、[技术与验证报告](docs/技术与验证报告.md)及[工作台截图](docs/validation/v0.2.0/workbench.png)。旧版 8 个模型案例单独保留作历史记录。
 
-未验证 Windows、完全离线模型、生产多人部署及未收录主题的准确率。工具输入仍需与用户给定参数核对。
+当前 Vue 改造的本机检查应区分 Python 离线测试、前端测试/构建、浏览器交互和真实模型调用；前三项不能替代真实 API 验证。完全离线模型、生产多人部署及未收录主题的准确率不在当前验证范围内。工具输入仍需与用户给定参数核对。
