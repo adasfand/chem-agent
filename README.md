@@ -87,7 +87,6 @@ npm run dev
 | `npm run build` | 在 `web/` 编译交付页面到 `dist/` |
 | `python scripts/validate_live.py` | 重新执行 8 个真实模型案例，消耗 API 额度 |
 | `python scripts/package.py` | 打包源码、知识卡和前端项目；若已有前端构建产物则一并包含 |
-| `python scripts/package_frontend_dependencies.py` | 单独归档本机 Windows 前端依赖，供兼容环境离线开发 |
 
 命令行补参时，用前一结果的 `run_id` 替换 `RUN_ID`；指定记录须存在于本机 `runs/`：
 
@@ -125,7 +124,7 @@ docs/validation/     随包提供的验证证据
 
 2026-10-05 完成 API 独立启动调整：25 项 API/打包回归测试及 Ruff 检查通过；实际启动后端 `7860` 和前端 `5173`，验证 Vue 页面、15 张知识卡、会话及代理校验正常，浏览器控制台无错误。后端页面与静态资源路由返回 404；Python wheel 已核对只包含后端包。本次未调用真实模型 API。
 
-2026-10-04 完成 Windows 本机检查：Conda `chem-agent` / Python 3.12.14。前后端分离阶段 **161 项 Python 测试**通过；随后界面优化阶段通过 **33 项前端测试、23 项后端 UI/API 回归测试**。TypeScript、ESLint、Prettier 及最新前端构建通过，Python 分离阶段 Ruff 检查通过。前端 8 项业务请求均与后端接口对应。浏览器通过离线测试模型驱动真实本地检索与计算工具，检查热负荷、前序结果引用、补参关联、取消、刷新恢复、知识卡浏览和两种导出；桌面、平板及手机尺寸无横向溢出，控制台无错误。最新源码 ZIP 已更新；独立前端依赖 ZIP 沿用已核验版本，依赖未变。详见[本轮检查记录](docs/validation/vue-local/checks.json)与[当前页面](docs/validation/vue-local/workbench.png)。
+2026-10-04 完成 Windows 本机检查：Conda `chem-agent` / Python 3.12.14。前后端分离阶段 **161 项 Python 测试**通过；随后界面优化阶段通过 **33 项前端测试、23 项后端 UI/API 回归测试**。TypeScript、ESLint、Prettier 及最新前端构建通过，Python 分离阶段 Ruff 检查通过。前端 8 项业务请求均与后端接口对应。浏览器通过离线测试模型驱动真实本地检索与计算工具，检查热负荷、前序结果引用、补参关联、取消、刷新恢复、知识卡浏览和两种导出；桌面、平板及手机尺寸无横向溢出，控制台无错误。最新源码 ZIP 已更新；独立前端依赖 ZIP 沿用已核验版本，依赖未变。界面见[当前页面](docs/validation/vue-local/workbench.png)。
 
 界面优化保留重新连接时的输入草稿，后台标签页降低轮询频率，知识卡缓存合并重复请求并支持失败重试。工作台采用工程计算布局，区分公式示例与实际计算结果；平板与手机使用纵向布局，知识卡正文去除重复标题和来源。
 

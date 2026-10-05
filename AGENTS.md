@@ -20,7 +20,6 @@ Root planning reports describe proposals; consult `README.md` and code for imple
 - `python -m ruff format --check src tests scripts app.py cli.py`: verify formatting.
 - `python scripts/validate_live.py`: run billable DeepSeek acceptance cases when authorized.
 - `python scripts/package.py`: create the source delivery ZIP, including frontend source and any existing build output but excluding installed dependencies. A frontend build is optional for source packaging.
-- `python scripts/package_frontend_dependencies.py`: optionally archive installed Windows frontend dependencies separately; preserve third-party license files and platform/Node/lockfile metadata.
 
 ## Coding Style & Naming Conventions
 
