@@ -323,3 +323,19 @@ def test_knowledge_only_explanation_request_keeps_legacy_final_api(execution):
     assert (
         execution.complete(answer, "completed", [found["output"]["hits"][0]["chunk_id"]]) == answer
     )
+
+
+@pytest.mark.parametrize("negation", ["不要", "无需", "不需要", "不必", "不用"])
+def test_pure_conversion_request_can_explicitly_decline_explanation(execution, negation):
+    execution.trace.data["question"] = f"请只将25℃换成K，{negation}解释。"
+    execution = Execution(execution.knowledge, execution.trace)
+    assert not execution.requires_explanation
+    execution.set_plan([{"step_id": "s1", "goal": "换算", "tool_name": "convert_units"}])
+    execution.execute("convert_units", "s1", {"value": 25, "from_unit": "degC", "to_unit": "K"})
+    assert "298.15 K" in execution.complete("已换算。", "completed", [])
+
+
+def test_negating_extra_explanation_does_not_cancel_another_explicit_concept_request(execution):
+    execution.trace.data["question"] = "不要解释计算步骤，但请解释绝对温度与温差的区别。"
+    execution = Execution(execution.knowledge, execution.trace)
+    assert execution.requires_explanation

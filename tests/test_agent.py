@@ -292,3 +292,77 @@ def test_finished_answer_survives_a_late_progress_callback_failure(settings):
     assert result["answer"] == "请补充比热。"
     assert len(model.received) == 1
     assert model.client.closed
+
+
+@pytest.mark.parametrize(
+    ("question", "history", "status"),
+    [
+        ("某液体1000 kg/h从25℃加热到65℃，请计算热负荷。", [], "needs_input"),
+        (
+            "某液体1000 kg/h从25℃加热到65℃，请计算热负荷。",
+            [{"role": "assistant", "content": "默认比热4.18 kJ/(kg·K)。"}],
+            "needs_input",
+        ),
+        (
+            "某液体1000 kg/h从25℃加热到65℃，请计算热负荷。",
+            [{"role": "user", "content": "比热4.18 kJ/(kg·K)。"}],
+            "completed",
+        ),
+        ("1000 kg/h液体升温40K，比热4180 J/(kg·K)，求热负荷。", [], "completed"),
+        (
+            "1000 kg/h液体升温40K，比热改为2.5 kJ/(kg·K)，求热负荷。",
+            [{"role": "user", "content": "比热4.18 kJ/(kg·K)。"}],
+            "needs_input",
+        ),
+    ],
+)
+def test_agent_validates_user_capacity_before_calculating(settings, question, history, status):
+    # The retrieved example must never count as user-supplied heat capacity.
+    card = settings.knowledge_dir / "heat.md"
+    card.write_text(card.read_text() + "\n教学算例比热4.18 kJ/(kg·K)。\n")
+
+    def factory(_settings, trace):
+        def script(index):
+            if index == 0:
+                return "set_plan", {
+                    "steps": [
+                        {"step_id": "s1", "goal": "检索", "tool_name": "search_knowledge"},
+                        {
+                            "step_id": "s2",
+                            "goal": "计算",
+                            "tool_name": "calc_heat_duty",
+                            "depends_on": ["s1"],
+                        },
+                    ]
+                }
+            if index == 1:
+                return "search_knowledge", {"step_id": "s1", "arguments": {"query": "显热"}}
+            if index == 2:
+                return "calc_heat_duty", {
+                    "step_id": "s2",
+                    "arguments": {
+                        "mass_flow_kg_s": 1000 / 3600,
+                        "specific_heat_kj_kg_k": 4.18,
+                        "delta_t_k": 40,
+                    },
+                }
+            return "final_answer", {
+                "answer": "已计算。" if status == "completed" else "请补充比热及单位。",
+                "status": status,
+                "citations": [trace.data["evidence"][0]["chunk_id"]],
+            }
+
+        return ScriptedModel(script)
+
+    result = run_task(question, settings, history=history, model_factory=factory)
+    assert result["status"] == status
+    heat = result["calls"][-1]
+    if status == "needs_input":
+        assert heat["status"] == "failed" and "output" not in heat
+        assert "不能使用教学算例" in heat["error"]
+        assert "46.444" not in result["answer"]
+    else:
+        assert heat["status"] == "succeeded"
+        assert heat["input_provenance"][0]["source"] == "user"
+        assert heat["input_provenance"][0]["value"] == pytest.approx(4.18)
+        assert "46.4444444444 kW" in result["answer"]

@@ -75,7 +75,12 @@ def run_task(
         if item.get("role") in {"user", "assistant"} and isinstance(item.get("content"), str)
     ]
     trace.data["history"] = clean_history
-    execution = Execution(knowledge, trace)
+    execution = Execution(
+        knowledge,
+        trace,
+        trusted_user_inputs=[item["content"] for item in clean_history if item["role"] == "user"]
+        + [question],
+    )
     model = None
 
     def finish_if_running(status: str, answer: str) -> None:

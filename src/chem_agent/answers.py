@@ -82,7 +82,8 @@ def requires_concept_explanation(question: str) -> bool:
 
     This is a narrow completion guard, not a semantic intent classifier.
     """
-    return bool(re.search(r"解释|为什么|为何|区别|原理|含义|理由", question))
+    affirmative = re.sub(r"(?:不要|无需|不需要|不必|不用)(?:再|额外)?(?:解释|说明)", "", question)
+    return bool(re.search(r"解释|为什么|为何|区别|原理|含义|理由", affirmative))
 
 
 def _is_quantitative(text: str, calls: list[dict]) -> bool:

@@ -16,6 +16,7 @@ from chem_agent.answers import (
     requires_concept_explanation,
 )
 from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
+from chem_agent.inputs import supplied_specific_heat
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.trace import RunTrace, utc_now
 
@@ -31,9 +32,15 @@ class PlanStep(BaseModel):
 
 
 class Execution:
-    def __init__(self, knowledge: KnowledgeBase, trace: RunTrace):
+    def __init__(
+        self,
+        knowledge: KnowledgeBase,
+        trace: RunTrace,
+        trusted_user_inputs: list[str] | None = None,
+    ):
         self.knowledge = knowledge
         self.trace = trace
+        self.trusted_user_inputs = trusted_user_inputs
         self.requires_explanation = requires_concept_explanation(trace.data["question"])
         self.results: dict[str, dict] = {}
         self.functions = {
@@ -199,6 +206,12 @@ class Execution:
                 inspect.signature(self.functions[tool_name]).bind(**resolved)
             except TypeError:
                 raise ValueError("工具参数缺失或存在多余字段，请按工具说明提供参数。") from None
+            if tool_name == "calc_heat_duty" and self.trusted_user_inputs is not None:
+                call["input_provenance"] = [
+                    supplied_specific_heat(
+                        resolved["specific_heat_kj_kg_k"], self.trusted_user_inputs
+                    )
+                ]
             step["status"] = "running"
             self.trace.save()
             output = self.functions[tool_name](**resolved)
