@@ -31,6 +31,8 @@ def test_capacity_normalizes_user_units(text):
         ["比热4.18 kJ/(kg·K)", "比热改为2.5 kJ/(kg·K)"],
         ["比热4.18 kJ/(kg·K)", "比热改为2.5"],
         ["比热4.18 kJ/(kg·K)", "比热未知"],
+        ["比热4.18 kJ/(kg·K)", "比热不要使用4.18 kJ/(kg·K)，该值已撤回。"],
+        ["比热未知，教材示例4.18 kJ/(kg·K)。"],
         ["比热4.18 kJ/(kg·kPa)"],
         ["比热4.18 kJ/(kg·kg)"],
         ["比热4.18 kJ/(kg·K/mol)"],

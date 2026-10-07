@@ -25,6 +25,13 @@ def supplied_specific_heat(value: float, user_inputs: list[str]) -> dict:
         raise ValueError("比热需要是有限数值。")
     for index in range(len(user_inputs) - 1, -1, -1):
         text = unicodedata.normalize("NFKC", user_inputs[index]).casefold()
+        if re.search(
+            r"(?:比热(?:容)?|c_?p)[^。；\n]{0,16}"
+            r"(?:不要使用|不使用|不采用|不能使用|未知|未给|未提供|不确定|缺少|撤回)"
+            r"|(?:撤回|不使用|不采用|不要使用)[^。；\n]{0,16}(?:比热|c_?p)",
+            text,
+        ):
+            break
         candidates = []
         for match in _CAPACITY.finditer(text):
             prefix = re.split(r"[。；\n]", text[: match.start()])[-1]
