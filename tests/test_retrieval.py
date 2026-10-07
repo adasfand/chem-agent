@@ -1,6 +1,9 @@
 """Offline contract tests for the persistent retrieval adapter."""
 
+import asyncio
+import base64
 import json
+import struct
 from pathlib import Path
 from stat import S_IMODE
 from types import SimpleNamespace
@@ -42,7 +45,11 @@ def _write_stores(directory: Path, *, content: str, doc_id: str = "doc-heat") ->
                 {
                     "embedding_dim": 512,
                     "data": [{"__id__": "chunk-heat"}] if name == "chunks" else [],
-                    "matrix": "",
+                    "matrix": (
+                        base64.b64encode(struct.pack("512f", *([1.0] * 512))).decode("ascii")
+                        if name == "chunks"
+                        else ""
+                    ),
                 }
             ),
             encoding="utf-8",
@@ -167,13 +174,128 @@ def test_rag_passes_chinese_to_sdk_without_downloading(settings, monkeypatch):
 
     def fake_rag(**kwargs):
         constructors.append(("rag", kwargs))
-        return object()
+        return SimpleNamespace()
 
     monkeypatch.setattr(fastembed, "TextEmbedding", fake_embedding)
     monkeypatch.setattr(lightrag, "LightRAG", fake_rag)
     _make_rag(settings, settings.root / "index", allow_download=False)
     assert constructors[0][1]["local_files_only"] is True
     assert constructors[1][1]["addon_params"] == {"language": "Chinese"}
+    assert constructors[1][1]["workspace"] == ""
+
+
+@pytest.mark.parametrize("change", ["directory", "root", "rebuilt_snapshot"])
+def test_real_sdk_keeps_chunk_stores_isolated_without_changing_disk_paths(
+    tmp_path, monkeypatch, change
+):
+    monkeypatch.setenv("WORKSPACE", "unrelated-application")
+    monkeypatch.setattr("fastembed.TextEmbedding", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        "lightrag.llm.openai.openai_complete_if_cache",
+        lambda *_args, **_kwargs: pytest.fail("storage regression must never call a model"),
+    )
+    first_root = tmp_path / "first-project"
+    second_root = tmp_path / "second-project" if change == "root" else first_root
+    first_dir = first_root / "index-v1"
+    second_dir = first_root / "index-v2" if change == "directory" else second_root / "index-v1"
+    first_dir.mkdir(parents=True)
+    first_file = first_dir / "kv_store_text_chunks.json"
+    first_file.write_text(
+        json.dumps({"chunk-old": {"content": "旧资料", "file_path": "heat.md"}}),
+        encoding="utf-8",
+    )
+
+    async def exercise():
+        first = _make_rag(Settings(root=first_root), first_dir, allow_download=False)
+        await first.initialize_storages()
+        try:
+            assert (await first.text_chunks.get_by_id("chunk-old"))["content"] == "旧资料"
+        finally:
+            await first.finalize_storages()
+        second_dir.mkdir(parents=True, exist_ok=True)
+        (second_dir / "kv_store_text_chunks.json").write_text(
+            json.dumps({"chunk-new": {"content": "新资料与新边界", "file_path": "heat.md"}}),
+            encoding="utf-8",
+        )
+        second = _make_rag(Settings(root=second_root), second_dir, allow_download=False)
+        assert second.workspace != first.workspace
+        await second.initialize_storages()
+        try:
+            assert (await second.text_chunks.get_by_id("chunk-new"))["content"] == "新资料与新边界"
+            assert await second.text_chunks.get_by_id("chunk-old") is None
+            assert Path(second.text_chunks._file_name) == second_dir / "kv_store_text_chunks.json"
+            assert all(
+                not (directory / "unrelated-application").exists()
+                for directory in (first_dir, second_dir)
+            )
+        finally:
+            await second.finalize_storages()
+        same_snapshot = _make_rag(Settings(root=second_root), second_dir, allow_download=False)
+        assert same_snapshot.workspace == second.workspace
+        await same_snapshot.initialize_storages()
+        try:
+            assert (await same_snapshot.text_chunks.get_by_id("chunk-new"))["content"] == (
+                "新资料与新边界"
+            )
+        finally:
+            await same_snapshot.finalize_storages()
+
+    asyncio.run(exercise())
+
+
+def test_real_sdk_build_retry_does_not_inherit_an_unflushed_partial_build(settings, monkeypatch):
+    monkeypatch.setattr("fastembed.TextEmbedding", lambda **_kwargs: object())
+    directory = settings.root / "build" / "lightrag" / "retry"
+
+    async def exercise():
+        first = _make_rag(settings, directory, allow_download=True)
+        await first.initialize_storages()
+        try:
+            await first.text_chunks.upsert(
+                {"chunk-partial": {"content": "未发布的旧片段", "file_path": "heat.md"}}
+            )
+        finally:
+            await first.finalize_storages()
+        assert not (directory / "kv_store_text_chunks.json").exists()
+        retry = _make_rag(settings, directory, allow_download=True)
+        assert retry.workspace != first.workspace
+        await retry.initialize_storages()
+        try:
+            assert await retry.text_chunks.get_by_id("chunk-partial") is None
+        finally:
+            await retry.finalize_storages()
+
+    asyncio.run(exercise())
+
+
+def test_real_sdk_mix_query_reads_existing_index_with_offline_provider(settings, monkeypatch):
+    import numpy as np
+
+    retriever = HybridRetriever(settings)
+    _ready_manifest(retriever)
+    vector_path = retriever.directory / "vdb_chunks.json"
+    vectors = json.loads(vector_path.read_text(encoding="utf-8"))
+    vectors["data"][0].update(content="显热公式 Q=m cp ΔT。", file_path="heat.md")
+    vector_path.write_text(json.dumps(vectors), encoding="utf-8")
+    calls = []
+
+    class OfflineEmbedding:
+        def embed(self, texts):
+            return [np.ones(512, dtype=np.float32) for _ in texts]
+
+    async def offline_completion(*_args, **_kwargs):
+        calls.append("keywords")
+        return json.dumps({"high_level_keywords": ["热负荷"], "low_level_keywords": ["显热"]})
+
+    monkeypatch.setattr("fastembed.TextEmbedding", lambda **_kwargs: OfflineEmbedding())
+    monkeypatch.setattr("lightrag.llm.openai.openai_complete_if_cache", offline_completion)
+    result = retriever.search("显热公式和适用条件")
+    assert result["status"] == "ok"
+    assert result["retrieval"]["mode"] == "mix"
+    assert result["hits"][0]["chunk_id"] == "chunk-heat"
+    assert result["hits"][0]["source"] == "教学资料；https://example.org/heat，"
+    assert result["retrieval"]["references"][0]["url"] == "https://example.org/heat"
+    assert calls == ["keywords"]
 
 
 def test_ready_mix_maps_graph_and_real_chunks(settings, monkeypatch):
@@ -298,6 +420,82 @@ def test_missing_or_corrupt_store_is_not_ready(settings):
     assert retriever.index_status["state"] == "ready"
     (retriever.directory / "vdb_chunks.json").write_text("{broken", encoding="utf-8")
     assert retriever.index_status["state"] == "error"
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "bad_base64",
+        "missing_row",
+        "wrong_dimension",
+        "nan",
+        "infinity",
+        "zero",
+        "overflow_norm",
+        "underflow_norm",
+        "duplicate_id",
+    ],
+)
+def test_invalid_embedding_payload_falls_back_before_loading_model(
+    settings, monkeypatch, corruption
+):
+    retriever = HybridRetriever(settings)
+    _ready_manifest(retriever)
+    assert retriever.index_status["state"] == "ready"
+    vector_path = retriever.directory / "vdb_chunks.json"
+    vectors = json.loads(vector_path.read_text(encoding="utf-8"))
+    if corruption == "bad_base64":
+        vectors["matrix"] = "invalid-base64"
+    elif corruption == "missing_row":
+        vectors["matrix"] = ""
+    elif corruption == "wrong_dimension":
+        vectors["matrix"] = base64.b64encode(struct.pack("511f", *([1.0] * 511))).decode()
+    elif corruption == "duplicate_id":
+        vectors["data"].append(dict(vectors["data"][0]))
+        vectors["matrix"] *= 2
+    else:
+        value = {
+            "nan": float("nan"),
+            "infinity": float("inf"),
+            "zero": 0.0,
+            "overflow_norm": 3.0e38,
+            "underflow_norm": 1.0e-40,
+        }[corruption]
+        vectors["matrix"] = base64.b64encode(struct.pack("512f", *([value] * 512))).decode()
+    vector_path.write_text(json.dumps(vectors), encoding="utf-8")
+    monkeypatch.setattr(
+        "chem_agent.retrieval._make_rag",
+        lambda *_args, **_kwargs: pytest.fail("invalid vectors must not construct the SDK"),
+    )
+    assert retriever.index_status["state"] == "error"
+    result = retriever.search("显热公式")
+    assert result["retrieval"]["mode"] == "lexical"
+    assert result["retrieval"]["metadata"]["fallback_reason"] == "error"
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [
+        '<graphml xmlns="http://graphml.graphdrawing.org/xmlns"><graph',
+        '<graphml xmlns="http://graphml.graphdrawing.org/xmlns"/>',
+        '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">'
+        '<graph edgedefault="undirected"><node id="x"><data key="unknown">x</data></node>'
+        "</graph></graphml>",
+    ],
+)
+def test_invalid_graphml_falls_back_before_loading_model(settings, monkeypatch, graph):
+    retriever = HybridRetriever(settings)
+    _ready_manifest(retriever)
+    assert retriever.index_status["state"] == "ready"
+    (retriever.directory / "graph_chunk_entity_relation.graphml").write_text(
+        graph, encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "chem_agent.retrieval._make_rag",
+        lambda *_args, **_kwargs: pytest.fail("invalid graph must not construct the SDK"),
+    )
+    assert retriever.index_status["state"] == "error"
+    assert retriever.search("显热公式")["retrieval"]["mode"] == "lexical"
 
 
 def test_index_status_repairs_existing_cache_permissions(settings):

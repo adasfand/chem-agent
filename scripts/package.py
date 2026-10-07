@@ -20,25 +20,52 @@ FILES = {
     "start.sh",
     "start.bat",
     "THIRD_PARTY_NOTICES.md",
+    "Dockerfile",
+    "compose.yaml",
+    ".dockerignore",
+    "化工知识增强与工具调用_代码交付初步方案.md",
 }
 DIRECTORIES = {"src", "data", "examples", "tests", "scripts", "docs"}
+EXCLUDED_PARTS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".DS_Store",
+    ".env",
+    ".venv",
+    ".local",
+    ".git",
+    "runs",
+    "build",
+    "dist",
+}
 
 
 def main():
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
     output = ROOT / "dist" / f"chem-agent-demo-{version}.zip"
     output.parent.mkdir(exist_ok=True)
+    resolved_root = ROOT.resolve()
     included = []
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(ROOT.rglob("*")):
+        candidates = [ROOT / name for name in FILES]
+        for name in DIRECTORIES:
+            directory = ROOT / name
+            if not directory.is_symlink():
+                candidates.extend(directory.rglob("*"))
+        for path in sorted(candidates):
             relative = path.relative_to(ROOT)
-            if not path.is_file() or path.is_symlink():
+            if (
+                not path.is_file()
+                or path.is_symlink()
+                or not path.resolve().is_relative_to(resolved_root)
+            ):
                 continue
             if relative.parts[0] not in DIRECTORIES and str(relative) not in FILES:
                 continue
-            if any(
-                part in {"__pycache__", ".pytest_cache", ".DS_Store", ".env"}
-                for part in relative.parts
+            if (
+                any(part in EXCLUDED_PARTS or part.startswith(".env.") for part in relative.parts)
+                and str(relative) != ".env.example"
             ):
                 continue
             if path.suffix in {".pyc", ".tmp"}:

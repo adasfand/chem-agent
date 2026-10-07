@@ -52,11 +52,23 @@ class Settings:
                     "无法读取 DEEPSEEK_API_KEY_FILE，请检查本机配置和文件权限。"
                 ) from None
         base_url = config.get("DEEPSEEK_BASE_URL") or "https://api.deepseek.com"
-        parsed = urlparse(base_url)
+        try:
+            parsed = urlparse(base_url)
+            hostname = parsed.hostname
+            port = parsed.port
+        except ValueError:
+            raise ValueError("模型地址格式无效，请提供有效的主机和端口。") from None
+        if (
+            not hostname
+            or any(char.isspace() for char in hostname)
+            or parsed.netloc.endswith(":")
+            or (port is not None and not 1 <= port <= 65535)
+        ):
+            raise ValueError("模型地址格式无效，请提供有效的主机和端口。")
         if parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("模型地址不能包含凭据、查询参数或片段。")
         if parsed.scheme != "https" and not (
-            parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+            parsed.scheme == "http" and hostname in {"127.0.0.1", "localhost", "::1"}
         ):
             raise ValueError("模型地址需要使用 HTTPS；本地服务可使用 HTTP。")
         timeout = float(config.get("CHEM_REQUEST_TIMEOUT") or 60)

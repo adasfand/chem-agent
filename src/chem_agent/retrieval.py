@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
@@ -11,6 +12,8 @@ import shutil
 from pathlib import Path, PurePosixPath
 from stat import S_IMODE
 from typing import Any
+from uuid import uuid4
+from xml.etree.ElementTree import ParseError
 
 from chem_agent.config import Settings
 from chem_agent.knowledge import KnowledgeBase
@@ -35,6 +38,20 @@ _REQUIRED_STORE_FILES = (
     "vdb_chunks.json",
     "vdb_entities.json",
     "vdb_relationships.json",
+)
+_RAG_STORAGES = (
+    "full_docs",
+    "text_chunks",
+    "full_entities",
+    "full_relations",
+    "entity_chunks",
+    "relation_chunks",
+    "entities_vdb",
+    "relationships_vdb",
+    "chunks_vdb",
+    "chunk_entity_relation_graph",
+    "llm_response_cache",
+    "doc_status",
 )
 
 
@@ -93,6 +110,9 @@ def _validate_index_stores(
     directory: Path, documents: int, chunks: int, sources: list[str]
 ) -> None:
     """Parse stores once per file version; later status reads only stat metadata."""
+    import networkx as nx
+    import numpy as np
+
     if documents != len(sources) or len(set(sources)) != documents:
         raise ValueError("invalid document manifest")
     chunk_data = json.loads((directory / "kv_store_text_chunks.json").read_text(encoding="utf-8"))
@@ -126,14 +146,32 @@ def _validate_index_stores(
             or not isinstance(vectors.get("matrix"), str)
         ):
             raise ValueError("invalid vector store")
-        if name == "chunks" and {
-            item.get("__id__") for item in vectors["data"] if isinstance(item, dict)
-        } != set(chunk_data):
+        records = vectors["data"]
+        if any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("__id__"), str)
+            or not item["__id__"]
+            for item in records
+        ):
+            raise ValueError("invalid vector records")
+        identifiers = {item["__id__"] for item in records}
+        if len(identifiers) != len(records):
+            raise ValueError("duplicate vector records")
+        matrix = base64.b64decode(vectors["matrix"], validate=True)
+        if len(matrix) != len(records) * EMBEDDING_DIM * np.dtype(np.float32).itemsize:
+            raise ValueError("vector matrix does not match records")
+        values = np.frombuffer(matrix, dtype=np.float32).reshape(-1, EMBEDDING_DIM)
+        with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+            norms = np.linalg.norm(values, axis=1)
+        if not np.isfinite(values).all() or not np.isfinite(norms).all() or (norms == 0).any():
+            raise ValueError("invalid embedding values")
+        if name == "chunks" and identifiers != set(chunk_data):
             raise ValueError("chunk vectors do not match source chunks")
 
-    with (directory / "graph_chunk_entity_relation.graphml").open("rb") as handle:
-        if b"<graphml" not in handle.read(512):
-            raise ValueError("invalid graph storage")
+    try:
+        nx.read_graphml(directory / "graph_chunk_entity_relation.graphml")
+    except (nx.NetworkXException, ParseError, KeyError, TypeError, ValueError):
+        raise ValueError("invalid graph storage") from None
 
 
 def _safe_string(value: Any, settings: Settings, limit: int) -> tuple[str, bool]:
@@ -164,8 +202,7 @@ def _source_catalog(knowledge: KnowledgeBase) -> dict[str, dict[str, str]]:
     for item in knowledge.inventory():
         doc_id = item["doc_id"]
         metadata = {"doc_id": doc_id, "title": item["title"], "source": item["source"]}
-        for suffix in (".md", ".txt"):
-            catalog[f"{doc_id}{suffix}"] = metadata
+        catalog[item["file_path"]] = metadata
     return catalog
 
 
@@ -188,6 +225,29 @@ def _card_for_path(raw: Any, catalog: dict[str, dict[str, str]]) -> dict[str, st
 def _source_url(source: str) -> str:
     match = re.search(r"https?://[^\s<>\"']+", source)
     return match.group(0).rstrip(".,;:!?)，。；：！？）]") if match else ""
+
+
+def _bind_storage_workspace(rag: Any, directory: Path, *, building: bool) -> None:
+    """Isolate SDK shared memory while retaining existing on-disk index paths.
+
+    In the pinned LightRAG 1.5.7 file stores, construction fixes file paths;
+    initialize_storages later binds shared data and locks by workspace. Bind
+    before initialization, keeping all storage instances on the same namespace.
+    The chunk-file snapshot also separates a rebuilt index at the same path.
+    Never clear global SDK caches: another retriever may still be using them.
+    """
+    snapshot = directory / "kv_store_text_chunks.json"
+    stamp = None
+    if snapshot.is_file():
+        info = snapshot.stat()
+        stamp = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    identity = f"{directory.resolve()}\0{stamp}\0{uuid4().hex if building else ''}"
+    workspace = "chem-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    rag.workspace = workspace
+    for name in _RAG_STORAGES:
+        storage = getattr(rag, name, None)
+        if storage is not None:
+            storage.workspace = workspace
 
 
 def _make_rag(settings: Settings, directory: Path, *, allow_download: bool):
@@ -237,8 +297,9 @@ def _make_rag(settings: Settings, directory: Path, *, allow_download: bool):
             **kwargs,
         )
 
-    return LightRAG(
+    rag = LightRAG(
         working_dir=str(directory),
+        workspace="",
         addon_params={"language": GRAPH_LANGUAGE},
         llm_model_func=complete,
         llm_model_name=settings.model,
@@ -253,6 +314,8 @@ def _make_rag(settings: Settings, directory: Path, *, allow_download: bool):
         entity_extract_max_gleaning=0,
         auto_manage_storages_states=False,
     )
+    _bind_storage_workspace(rag, directory, building=allow_download)
+    return rag
 
 
 async def _query_ready(rag: Any, query: str, top_k: int) -> dict[str, Any]:

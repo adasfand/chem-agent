@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from time import perf_counter
 
 from smolagents import OpenAIModel
 
@@ -58,6 +59,8 @@ class TracedModel(OpenAIModel):
         return request
 
     def generate(self, *args, **kwargs):
+        if self.trace.data["status"] != "running":
+            raise ModelUnavailable("任务已经结束，不能继续请求模型。")
         if self.cancel_event and self.cancel_event.is_set():
             raise RunCancelled("任务已取消。")
         if self.last_error:
@@ -65,6 +68,8 @@ class TracedModel(OpenAIModel):
         self.request_count += 1
         if self.request_count > self.request_limit:
             raise ModelUnavailable("已达到本次任务的模型请求上限。")
+        started = perf_counter()
+        request_index = len(self.trace.data["model_requests"])
         try:
             response = super().generate(*args, **kwargs)
         except Exception as exc:
@@ -78,12 +83,21 @@ class TracedModel(OpenAIModel):
             else:
                 message = "模型请求失败或超时，请检查网络、服务地址和模型名称后重试。"
             self.last_error = message
-            if self.trace.data["model_requests"]:
-                self.trace.data["model_requests"][-1].update(status="failed", error=message)
+            if len(self.trace.data["model_requests"]) > request_index:
+                self.trace.data["model_requests"][-1].update(
+                    status="failed",
+                    error=message,
+                    finished_at=utc_now(),
+                    latency_ms=round((perf_counter() - started) * 1000, 3),
+                )
                 self.trace.save()
             raise ModelUnavailable(message) from None
         entry = self.trace.data["model_requests"][-1]
-        entry["status"] = "succeeded"
+        entry.update(
+            status="succeeded",
+            finished_at=utc_now(),
+            latency_ms=round((perf_counter() - started) * 1000, 3),
+        )
         usage = response.token_usage
         entry["usage"] = (
             {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens}

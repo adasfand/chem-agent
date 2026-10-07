@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import re
 from copy import deepcopy
+from time import perf_counter
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -125,6 +126,7 @@ class Execution:
     def execute(self, tool_name: str, step_id: str, arguments: dict) -> dict:
         if self.trace.data["status"] != "running":
             raise ValueError("任务已经结束，不能继续调用工具。")
+        started = perf_counter()
         call = {
             "call_id": f"call_{len(self.trace.data['calls']) + 1}",
             "step_id": step_id,
@@ -142,16 +144,27 @@ class Execution:
                 raise ValueError("已达到本次任务的工具调用次数上限。")
             if not step or step["tool_name"] != tool_name:
                 raise ValueError("工具和步骤必须与已登记计划一致。")
-            if step["status"] == "succeeded":
+            retry_empty_search = (
+                tool_name == "search_knowledge"
+                and step_id in self.results
+                and not self.results[step_id]["hits"]
+            )
+            if step["status"] == "succeeded" and not retry_empty_search:
                 raise ValueError("此步骤已完成，请使用其现有结果。")
             if not all(dep in self.results for dep in step["depends_on"]):
                 raise ValueError("前序步骤未成功，不能执行依赖计算。")
+            if any(
+                "hits" in self.results[dep] and not self.results[dep]["hits"]
+                for dep in step["depends_on"]
+            ):
+                raise ValueError("前序检索没有证据，不能执行依赖步骤；请先重试该检索。")
             if not isinstance(arguments, dict):
                 raise ValueError("arguments 必须是参数对象。")
             units = {"value": arguments.get("from_unit")} if tool_name == "convert_units" else None
             resolved = self._resolve(arguments, step["depends_on"], call["input_refs"], units=units)
             call["arguments"] = resolved
-            # Converting a flow before heat duty must feed the real conversion output.
+            # A flow conversion dependency requires a real, unit-checked flow
+            # reference; a later mass balance may provide the flow being heated.
             conversion_deps = []
             for prior in self.trace.data["plan"]:
                 if prior["step_id"] in step["depends_on"] and prior["tool_name"] == "convert_units":
@@ -162,12 +175,11 @@ class Execution:
                     conversion_deps.append(prior["step_id"])
             if tool_name == "calc_heat_duty" and conversion_deps:
                 if not any(
-                    r["argument"] == "mass_flow_kg_s"
-                    and r["ref"] in {f"{dep}.value" for dep in conversion_deps}
+                    r["argument"] == "mass_flow_kg_s" and r.get("unit") == "kg/s"
                     for r in call["input_refs"]
                 ):
                     raise ValueError(
-                        "质量流量必须用 {$ref: 'sN.value'} 引用前序换算结果，不能重抄数值。"
+                        "质量流量必须用 $ref 引用已成功依赖步骤的流量结果，不能重抄数值。"
                     )
             try:
                 inspect.signature(self.functions[tool_name]).bind(**resolved)
@@ -192,9 +204,12 @@ class Execution:
             raise ValueError(str(exc)) from None
         finally:
             call["finished_at"] = utc_now()
+            call["latency_ms"] = round((perf_counter() - started) * 1000, 3)
             self.trace.save()
 
     def complete(self, answer: str, status: str, citations: list[str]) -> str:
+        if self.trace.data["status"] != "running":
+            raise ValueError("任务已经结束，不能改写最终状态或回答。")
         if status not in {"completed", "needs_input", "no_evidence", "failed", "out_of_scope"}:
             raise ValueError("未知任务状态。")
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 16000:
@@ -210,8 +225,8 @@ class Execution:
             ):
                 raise ValueError("计划尚未全部成功执行，不能声明完成。")
             searches = [o for s, o in self.results.items() if "hits" in o]
-            if searches and not evidence_ids:
-                raise ValueError("检索没有证据，请使用 no_evidence 状态。")
+            if any(not output["hits"] for output in searches):
+                raise ValueError("计划中的检索没有证据，请重试该检索或使用 no_evidence 状态。")
             if evidence_ids and not citations:
                 raise ValueError("回答需要引用本次检索来源。")
         self.trace.finish(status, answer, citations)

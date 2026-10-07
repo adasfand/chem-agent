@@ -129,3 +129,19 @@ def test_empty_directory_and_plain_text(tmp_path: Path) -> None:
     assert hit["title"] == "flow"
     assert hit["source"] == "来源未注明"
     assert populated.version != empty.version
+
+
+def test_inventory_preserves_the_actual_relative_file_path(tmp_path: Path) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "HEAT.MD").write_text("# 显热\n来源：测试作者\n\n热负荷公式。", encoding="utf-8")
+    assert KnowledgeBase(tmp_path).inventory()[0]["file_path"] == "nested/HEAT.MD"
+
+
+def test_same_stem_markdown_and_text_are_rejected_instead_of_sharing_citation_ids(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "heat.md").write_text("# 资料甲\n来源：作者甲\n\n显热公式。", encoding="utf-8")
+    (tmp_path / "heat.txt").write_text("# 资料乙\n来源：作者乙\n\n不同计算条件。", encoding="utf-8")
+    with pytest.raises(ValueError, match="知识文档编号重复"):
+        KnowledgeBase(tmp_path)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,9 +37,12 @@ def redact(value: Any, secrets: tuple[str, ...] = ()) -> Any:
 
 
 class RunTrace:
-    def __init__(self, directory: Path, question: str, config: dict, version: str, secrets=()):
+    def __init__(
+        self, directory: Path, question: str, config: dict, version: str, secrets=(), *, mode="live"
+    ):
         self.directory = directory
         self.secrets = tuple(secrets)
+        self._started = time.perf_counter()
         self.run_id = (
             datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:10]
         )
@@ -46,7 +50,7 @@ class RunTrace:
         self.data = {
             "schema_version": 1,
             "run_id": self.run_id,
-            "mode": "live",
+            "mode": mode,
             "started_at": utc_now(),
             "question": question,
             "config": config,
@@ -73,7 +77,11 @@ class RunTrace:
 
     def finish(self, status: str, answer: str, citations: list[str] | None = None) -> None:
         self.data.update(
-            status=status, answer=answer, citations=citations or [], finished_at=utc_now()
+            status=status,
+            answer=answer,
+            citations=citations or [],
+            finished_at=utc_now(),
+            latency_ms=round((time.perf_counter() - self._started) * 1000, 3),
         )
         self.save()
 

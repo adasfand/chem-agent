@@ -91,6 +91,28 @@ def test_knowledge_base_rejects_symlinked_card_before_read(tmp_path: Path):
         KnowledgeBase(cards)
 
 
+def test_rag_sources_use_real_case_sensitive_paths_and_supported_extensions(tmp_path: Path):
+    cards = tmp_path / "data" / "knowledge"
+    cards.mkdir(parents=True)
+    (cards / "HEAT.MD").write_text("# 显热\n来源：作者甲\n\n显热公式。", encoding="utf-8")
+    (cards / "units.txt").write_text("# 单位\n来源：作者乙\n\n单位换算。", encoding="utf-8")
+    knowledge = KnowledgeBase(cards)
+    raw = {
+        "data": {
+            "chunks": [
+                {"chunk_id": "heat", "file_path": "HEAT.MD", "content": "显热公式。"},
+                {"chunk_id": "units", "file_path": "units.txt", "content": "单位换算。"},
+                {"chunk_id": "invented", "file_path": "HEAT.txt", "content": "错误来源。"},
+            ]
+        }
+    }
+    result = _map_result(raw, "显热单位", 3, knowledge, Settings(root=tmp_path), tmp_path)
+    assert [(hit["chunk_id"], hit["source"]) for hit in result["hits"]] == [
+        ("heat", "作者甲"),
+        ("units", "作者乙"),
+    ]
+
+
 def test_cli_sanitizes_file_errors(monkeypatch, capsys, tmp_path: Path):
     def fail(_cls, _root):
         raise OSError(f"private path: {tmp_path / 'secret.md'}")

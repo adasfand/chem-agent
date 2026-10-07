@@ -38,16 +38,17 @@ class ScriptedModel(Model):
         item = self.script(index) if callable(self.script) else self.script[index]
         if isinstance(item, Exception):
             raise item
-        tool, arguments = item
+        calls = item if isinstance(item, list) else [item]
         return ChatMessage(
             role=MessageRole.ASSISTANT,
             content="",
             tool_calls=[
                 ChatMessageToolCall(
-                    id=f"fake-call-{index}",
+                    id=f"fake-call-{index}-{call_index}",
                     type="function",
                     function=ChatMessageToolCallFunction(name=tool, arguments=arguments),
                 )
+                for call_index, (tool, arguments) in enumerate(calls)
             ],
         )
 
@@ -215,3 +216,77 @@ def test_missing_configuration_is_reported_without_starting_model(settings):
     assert result["status"] == "failed"
     assert "尚未配置" in result["answer"]
     assert result["calls"] == []
+
+
+@pytest.mark.parametrize("batch_kind", ["business", "final_and_business", "multiple_final"])
+def test_multiple_tool_calls_are_rejected_before_any_action_and_can_be_corrected(
+    settings, batch_kind
+):
+    plan = {
+        "steps": [
+            {"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units", "depends_on": []}
+        ]
+    }
+    conversion = (
+        "convert_units",
+        {"step_id": "s1", "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"}},
+    )
+    premature_final = (
+        "final_answer",
+        {"answer": "不应提交的答复。", "status": "needs_input", "citations": []},
+    )
+    batches = {
+        "business": [("set_plan", plan), conversion],
+        "final_and_business": [premature_final, ("set_plan", plan)],
+        "multiple_final": [premature_final, premature_final],
+    }
+    model = ScriptedModel(
+        [
+            batches[batch_kind],
+            ("set_plan", plan),
+            conversion,
+            (
+                "final_answer",
+                {"answer": "1 MPa = 1000 kPa。", "status": "completed", "citations": []},
+            ),
+        ]
+    )
+    progress = []
+    result = run_task(
+        "1 MPa 换算为 kPa。",
+        settings,
+        model_factory=lambda *_: model,
+        on_progress=lambda value: progress.append(deepcopy(value)),
+    )
+    assert result["status"] == "completed"
+    assert result["answer"] == "1 MPa = 1000 kPa。"
+    assert len(model.received) == 4
+    assert len(result["calls"]) == 1
+    assert not progress[0]["plan"] and not progress[0]["calls"]
+    assert progress[0]["status"] == "running"
+    assert "每次回复只允许调用一个工具" in repr(model.received[1])
+
+
+def test_finished_answer_survives_a_late_progress_callback_failure(settings):
+    model = ScriptedModel(
+        [
+            (
+                "final_answer",
+                {"answer": "请补充比热。", "status": "needs_input", "citations": []},
+            )
+        ]
+    )
+
+    def broken_progress(_result):
+        raise RuntimeError("subscriber failure")
+
+    result = run_task(
+        "给定流量求热负荷。",
+        settings,
+        model_factory=lambda *_: model,
+        on_progress=broken_progress,
+    )
+    assert result["status"] == "needs_input"
+    assert result["answer"] == "请补充比热。"
+    assert len(model.received) == 1
+    assert model.client.closed

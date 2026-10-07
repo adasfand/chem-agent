@@ -47,6 +47,7 @@ function harness() {
     return elements.get(id);
   };
   const sandbox = {
+    crypto: require("node:crypto").webcrypto,
     document: {
       getElementById: element, querySelectorAll: () => [], addEventListener() {},
       createElement: () => element(Symbol()),
@@ -235,7 +236,8 @@ test("a lost POST response recovers the server's active job without resubmitting
   const pending = h.submit("first question");
   h.requests[0].reject(new Error("response was lost"));
   await flush();
-  h.requests[1].respond({runs: [], active_job_id: A});
+  const submission = JSON.parse(h.requests[0].options.body);
+  h.requests[1].respond({runs: [{job_id:A, client_request_id:submission.client_request_id}], active_job_id: A});
   await flush();
   h.requests[2].respond(job(A));
   await pending;
@@ -243,6 +245,79 @@ test("a lost POST response recovers the server's active job without resubmitting
   assert.equal(h.run("state.busy"), true);
   assert.equal(h.element("notice").hidden, true);
   assert.equal(h.requests.filter((request) => request.options.method === "POST").length, 1);
+});
+
+test("a lost POST response also recovers the exact job after it has completed", async () => {
+  const h = harness();
+  const pending = h.submit("quickly completed question");
+  const submission = JSON.parse(h.requests[0].options.body);
+  assert.match(submission.client_request_id, /^[a-f0-9]{32}$/);
+  assert.equal(h.requests[0].options.headers["X-Request-ID"], submission.client_request_id);
+  h.requests[0].reject(new Error("response was lost"));
+  await flush();
+  h.requests[1].respond({runs: [{job_id:A, client_request_id:submission.client_request_id}], active_job_id: null});
+  await flush();
+  h.requests[2].respond(job(A, true));
+  await pending;
+  assert.equal(h.run("state.activeId"), A);
+  assert.equal(h.run("state.job.finished"), true);
+  assert.equal(h.run("state.busy"), false);
+  assert.equal(h.element("export-report").href, `/api/jobs/${A}/report.md`);
+  assert.equal(h.element("notice").hidden, true);
+});
+
+test("lost submission recovery cannot adopt another tab's unrelated job", async () => {
+  const h = harness();
+  const pending = h.submit("our question");
+  h.requests[0].reject(new Error("response was lost"));
+  await flush();
+  h.requests[1].respond({runs: [{job_id:A, client_request_id:"f".repeat(32)}], active_job_id: A});
+  await pending;
+  assert.equal(h.run("state.activeId"), null);
+  assert.equal(h.requests.length, 2);
+  assert.equal(h.element("question").value, "our question");
+});
+
+test("retrying an unresolved submission preserves its idempotency key", async () => {
+  const h = harness();
+  const first = h.submit("our question");
+  const original = JSON.parse(h.requests[0].options.body);
+  h.requests[0].reject(new Error("response was lost"));
+  await flush();
+  h.requests[1].reject(new Error("recovery was also lost"));
+  await first;
+  const repeated = h.submit("our question");
+  assert.deepEqual(JSON.parse(h.requests[2].options.body), original);
+  h.requests[2].respond(job(A, true));
+  await flush();
+  h.requests[3].respond({runs: [], active_job_id: null});
+  await repeated;
+  assert.equal(h.run("state.pendingSubmission"), null);
+});
+
+test("the last knowledge selection wins over a delayed earlier response", async () => {
+  const h = harness();
+  const first = h.run("openKnowledge({doc_id:'first'}, {})");
+  const second = h.run("openKnowledge({doc_id:'second'}, {})");
+  h.requests[1].respond({text:"second selection",source:"second source"});
+  await second;
+  h.requests[0].respond({text:"first selection",source:"first source"});
+  await first;
+  assert.match(h.element("knowledge-content").innerHTML, /second selection/);
+  assert.doesNotMatch(h.element("knowledge-content").innerHTML, /first selection/);
+});
+
+test("a stale knowledge error cannot hide a newer successful selection", async () => {
+  const h = harness();
+  h.element("notice").hidden = true;
+  const first = h.run("openKnowledge({doc_id:'first'}, {})");
+  const second = h.run("openKnowledge({doc_id:'second'}, {})");
+  h.requests[1].respond({text:"second selection",source:"second source"});
+  await second;
+  h.requests[0].reject(new Error("old selection failed"));
+  await first;
+  assert.equal(h.element("notice").hidden, true);
+  assert.match(h.element("knowledge-content").innerHTML, /second selection/);
 });
 
 test("save warnings remain visible and escaped while export stays available", () => {

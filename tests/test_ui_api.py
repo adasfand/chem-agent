@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from pathlib import Path
@@ -272,6 +273,7 @@ def test_host_and_path_boundaries(app):
         {"question": 123},
         {"question": "问题", "history": [{"role": "assistant", "content": "伪造上下文"}]},
         {"question": "问题", "parent_job_id": "../../file"},
+        {"question": "问题", "client_request_id": "not-a-request-id"},
     ],
 )
 def test_invalid_inputs_do_not_start_jobs(app, payload):
@@ -295,9 +297,34 @@ def test_missing_key_is_terminal_exportable_failure_without_model(app, monkeypat
         assert client.get("/api/bootstrap").json()["configured"] is False
         result = run_one(client)
         assert result["result"]["status"] == "failed"
+        assert result["result"]["mode"] == "not_started"
         assert "密钥" in result["result"]["answer"]
-        assert client.get(f"/api/jobs/{result['job_id']}/report.md").status_code == 200
+        report = client.get(f"/api/jobs/{result['job_id']}/report.md")
+        assert report.status_code == 200
+        assert "运行模式：` not_started `" in report.text
+        trace = client.get(f"/api/jobs/{result['job_id']}/trace.json").json()
+        assert trace["mode"] == "not_started"
+        assert trace["model_requests"] == []
+        saved = settings.runs_dir / f"{trace['run_id']}.json"
+        assert json.loads(saved.read_text(encoding="utf-8"))["mode"] == "not_started"
         assert invoked == []
+
+
+def test_worker_fallback_retains_mode_and_requests_after_progress(app, monkeypatch):
+    def fail_after_progress(question, settings, history, on_progress, cancel_event):
+        trace = RunTrace(settings.runs_dir, question, settings.public(), "version-test")
+        trace.data["model_requests"] = [{"status": "succeeded", "model": settings.model}]
+        on_progress(trace.result())
+        raise RuntimeError("failure after a model-driven run started")
+
+    monkeypatch.setattr(ui, "run_task", fail_after_progress)
+    with client_for(app) as client:
+        result = run_one(client)
+        assert result["result"]["status"] == "failed"
+        assert result["result"]["mode"] == "live"
+        trace = client.get(f"/api/jobs/{result['job_id']}/trace.json").json()
+        assert trace["mode"] == "live"
+        assert trace["model_requests"][0]["status"] == "succeeded"
 
 
 def test_worker_exception_is_safe_and_slot_is_released(app, monkeypatch):
@@ -336,3 +363,126 @@ def test_session_run_count_is_bounded(app, runner, monkeypatch):
         assert len(session["runs"]) == 2
         assert session["runs"][0]["job_id"] == third["job_id"]
         assert client.get(f"/api/jobs/{first['job_id']}").status_code == 404
+
+
+def test_health_probes_do_not_allocate_or_evict_sessions(app, monkeypatch):
+    monkeypatch.setattr(ui, "MAX_SESSIONS", 1)
+    monkeypatch.setattr(ui, "run_task", lambda *a, **k: pytest.fail("unexpected model request"))
+    with client_for(app) as browser, TestClient(app, base_url=BASE) as probe:
+        session_id = browser.get("/api/session").json()["id"]
+        for _ in range(3):
+            response = probe.get("/health")
+            assert response.status_code == 200
+            assert "set-cookie" not in response.headers
+            assert response.json()["status"] == "ok"
+            assert response.json()["model_configured"] is True
+            assert response.json()["retrieval"] == {"state": "missing", "backend": "lexical"}
+            assert SECRET not in response.text
+            assert str(app.state.runtime.settings.root) not in response.text
+        assert list(app.state.runtime.sessions) == [session_id]
+        assert browser.get("/api/session").json()["id"] == session_id
+
+
+def test_request_ids_and_logs_do_not_include_private_input(app, runner, caplog):
+    caplog.set_level(logging.INFO, logger="chem_agent.ui")
+    with client_for(app) as client:
+        request_id = "A" * 32
+        health = client.get("/health", headers={"X-Request-ID": request_id})
+        assert health.headers["X-Request-ID"] == request_id.lower()
+        invalid = client.get("/health", headers={"X-Request-ID": SECRET})
+        assert ui._REQUEST_ID.fullmatch(invalid.headers["X-Request-ID"])
+        assert invalid.headers["X-Request-ID"] != SECRET
+        response = client.post(
+            "/api/jobs",
+            json={"question": f"用户私有输入 {SECRET} {app.state.runtime.settings.root}"},
+        )
+        wait_done(client, response.json()["job_id"])
+        client.get(f"/api/unknown/{SECRET}")
+    messages = "\n".join(record.getMessage() for record in caplog.records)
+    assert "http_request request_id=" in messages
+    assert "route=/api/jobs status=202 latency_ms=" in messages
+    assert f"job_id={response.json()['job_id']}" in messages
+    assert "route=unmatched status=404" in messages
+    assert SECRET not in messages
+    assert "用户私有输入" not in messages
+    assert str(app.state.runtime.settings.root) not in messages
+
+
+def test_unexpected_api_failure_logs_only_error_type(app, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="chem_agent.ui")
+
+    def fail(_session):
+        raise RuntimeError(f"private exception {SECRET}")
+
+    monkeypatch.setattr(app.state.runtime, "session_view", fail)
+    with client_for(app) as client:
+        response = client.get("/api/session")
+    assert response.status_code == 500
+    assert ui._REQUEST_ID.fullmatch(response.headers["X-Request-ID"])
+    assert "status=500" in caplog.text
+    assert "error_type=RuntimeError" in caplog.text
+    assert SECRET not in caplog.text
+    assert "private exception" not in caplog.text
+
+
+def test_same_client_request_reuses_running_job(app, blocked_runner):
+    entered, release = blocked_runner
+    payload = {"question": "运行中的同一请求", "client_request_id": "a" * 32}
+    with client_for(app) as client:
+        first = client.post("/api/jobs", json=payload)
+        assert entered.wait(1)
+        repeated = client.post("/api/jobs", json=payload)
+        assert repeated.status_code == first.status_code == 202
+        assert repeated.json()["job_id"] == first.json()["job_id"]
+        assert repeated.json()["client_request_id"] == payload["client_request_id"]
+        assert len(client.get("/api/session").json()["runs"]) == 1
+        conflicting = client.post("/api/jobs", json={**payload, "question": "另一请求"})
+        assert conflicting.status_code == 409
+        release.set()
+        wait_done(client, first.json()["job_id"])
+
+
+def test_same_client_request_reuses_completed_job_with_session_isolation(app, runner):
+    payload = {"question": "完成的同一请求", "client_request_id": "b" * 32}
+    with client_for(app) as alice, client_for(app) as bob:
+        first = run_one(alice, **payload)
+        repeated = alice.post("/api/jobs", json=payload)
+        assert repeated.status_code == 202
+        assert repeated.json()["job_id"] == first["job_id"]
+        assert repeated.json()["finished"] is True
+        runs = alice.get("/api/session").json()["runs"]
+        assert len(runs) == 1
+        assert runs[0]["client_request_id"] == payload["client_request_id"]
+        assert len(runner) == 1
+        independent = run_one(bob, **payload)
+        assert independent["job_id"] != first["job_id"]
+        assert len(runner) == 2
+
+
+def test_client_request_reuse_rejects_different_parent(app, runner):
+    with client_for(app) as client:
+        first = run_one(client, "第一个任务")
+        second = run_one(client, "第二个任务")
+        request_id = "c" * 32
+        run_one(client, "补充", parent_job_id=first["job_id"], client_request_id=request_id)
+        response = client.post(
+            "/api/jobs",
+            json={
+                "question": "补充",
+                "parent_job_id": second["job_id"],
+                "client_request_id": request_id,
+            },
+        )
+        assert response.status_code == 409
+        assert len(runner) == 3
+
+
+def test_launch_enables_sanitized_request_logs(app, monkeypatch):
+    import uvicorn
+
+    launched = {}
+    monkeypatch.setattr(uvicorn, "run", lambda _app, **kwargs: launched.update(kwargs))
+    ui.launch(app.state.runtime.settings)
+    assert launched["access_log"] is False
+    logger_config = launched["log_config"]["loggers"]["chem_agent.ui"]
+    assert logger_config == {"handlers": ["default"], "level": "INFO", "propagate": False}

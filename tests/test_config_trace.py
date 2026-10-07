@@ -36,3 +36,40 @@ def test_insecure_or_credential_bearing_endpoint_rejected(tmp_path, monkeypatch,
     monkeypatch.setenv("DEEPSEEK_BASE_URL", url)
     with pytest.raises(ValueError):
         Settings.load(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://",
+        "https:///api",
+        "https://:443",
+        "https://example.org:invalid",
+        "https://example.org:",
+        "https://example.org:0",
+        "https://example.org:65536",
+        "https://[::1",
+        "https://invalid host",
+    ],
+)
+def test_malformed_model_endpoint_is_rejected_before_task(tmp_path, monkeypatch, url):
+    monkeypatch.delenv("DEEPSEEK_API_KEY_FILE", raising=False)
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", url)
+    with pytest.raises(ValueError, match="有效的主机和端口"):
+        Settings.load(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://api.deepseek.com",
+        "https://example.org:443/v1",
+        "http://localhost:8000/v1",
+        "http://127.0.0.1:8000",
+        "http://[::1]:8000/v1",
+    ],
+)
+def test_valid_model_endpoint_preserves_supported_schemes(tmp_path, monkeypatch, url):
+    monkeypatch.delenv("DEEPSEEK_API_KEY_FILE", raising=False)
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", url)
+    assert Settings.load(tmp_path).base_url == url

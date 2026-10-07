@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 const labels = {running:"运行中",completed:"已完成",needs_input:"等待补充",no_evidence:"资料不足",failed:"未完成",out_of_scope:"不适用",cancelled:"已取消",pending:"待执行",succeeded:"成功"};
 const toolNames = {search_knowledge:"检索知识资料",convert_units:"核对并换算单位",calc_heat_duty:"计算显热负荷",calc_mass_balance:"计算混合衡算"};
-const state = {job:null, runs:[], activeId:null, view:"summary", selectedEntity:null, poll:null, rendering:"", busy:false, configured:false, indexStatus:null, submitting:false, selectionVersion:0, sessionVersion:0, cancellingId:null, loadingId:null};
+const state = {job:null, runs:[], activeId:null, view:"summary", selectedEntity:null, poll:null, rendering:"", busy:false, configured:false, indexStatus:null, submitting:false, selectionVersion:0, sessionVersion:0, knowledgeVersion:0, cancellingId:null, loadingId:null, pendingSubmission:null};
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jsonText = (value) => esc(JSON.stringify(value, null, 2));
 const badge = (status) => `<span class="badge ${Object.hasOwn(labels,status) ? status : "neutral"}">${esc(labels[status] || status)}</span>`;
@@ -316,7 +316,7 @@ function closeExports() {$("export-menu").hidden=true;$("export-toggle").setAttr
 function closeSidebar() {$("sidebar").classList.remove("open");$("history-toggle").setAttribute("aria-expanded","false");}
 function startNew(question="") {
   if(state.busy){notice("请等待当前任务完成，或先停止任务。");return;}
-  ++state.selectionVersion;clearTimeout(state.poll);state.job=null;state.activeId=null;state.loadingId=null;state.selectedEntity=null;state.rendering="";
+  ++state.selectionVersion;clearTimeout(state.poll);state.job=null;state.activeId=null;state.loadingId=null;state.selectedEntity=null;state.pendingSubmission=null;state.rendering="";
   $("question").value=question;updateCount();selectView("summary");renderHistory();closeSidebar();closeExports();$("question").focus();
 }
 function updateCount() {$("char-count").textContent=`${$("question").value.length} / 4000`;}
@@ -336,6 +336,7 @@ async function loadJob(id) {
 function showJob(job) {
   if(notice.connection){$("notice").hidden=true;notice.connection=false;}
   state.activeId=job.job_id;state.job=job;state.loadingId=null;state.selectedEntity=null;
+  state.pendingSubmission=null;
   $("question").value="";updateCount();selectView("summary");renderHistory();closeSidebar();closeExports();
   if(!job.finished)schedulePoll(job.job_id);
 }
@@ -376,10 +377,15 @@ async function submit(event) {
   const question=$("question").value.trim();
   if(!question){$("question").focus();return;}
   const parent=state.activeId, version=++state.selectionVersion;
+  if(state.pendingSubmission?.question!==question || state.pendingSubmission?.parent_job_id!==parent){
+    const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,"0")).join("");
+    state.pendingSubmission={question,parent_job_id:parent,client_request_id:id};
+  }
+  const submission=state.pendingSubmission;
   state.submitting=true;setBusy(true);closeExports();
   let accepted=false;
   try{
-    const response=await api("/api/jobs",{method:"POST",body:JSON.stringify({question,parent_job_id:parent})});
+    const response=await api("/api/jobs",{method:"POST",headers:{"X-Request-ID":submission.client_request_id},body:JSON.stringify(submission)});
     accepted=true;
     if(version!==state.selectionVersion)return;
     state.submitting=false;
@@ -389,15 +395,18 @@ async function submit(event) {
     if(version!==state.selectionVersion)return;
     notice(error.message,true);
     notice.connection=accepted || !error.status || error.status>=500;
-    if(!accepted){
-      // A lost POST response may still have started a server-side task.
+    if(!accepted && (!error.status || error.status>=500)){
+      // A lost POST response may have started or already completed this exact task.
       try{
         const session=await refreshSession();
-        if(version!==state.selectionVersion || !session.active_job_id)return;
-        const job=await api(`/api/jobs/${session.active_job_id}`);
+        if(version!==state.selectionVersion)return;
+        const recovered=list(session.runs).find(run=>run.client_request_id===submission.client_request_id);
+        if(!recovered)return;
+        const job=await api(`/api/jobs/${recovered.job_id}`);
         if(version===state.selectionVersion){state.submitting=false;showJob(job);}
       }catch{}
-    }else schedulePoll(state.activeId);
+    }else if(accepted)schedulePoll(state.activeId);
+    else state.pendingSubmission=null;
   }finally{
     if(version===state.selectionVersion){state.submitting=false;setBusy(isRunning());}
   }
@@ -440,12 +449,14 @@ $("about-open").addEventListener("click",()=>$("about-dialog").showModal());
 $("knowledge-open").addEventListener("click",()=>{$("knowledge-dialog").showModal();closeSidebar();});
 document.querySelectorAll(".close-dialog").forEach(button=>button.addEventListener("click",()=>button.closest("dialog").close()));
 async function openKnowledge(item,button) {
+  const version=++state.knowledgeVersion;
   try{
     const detail=await api(`/api/knowledge/${encodeURIComponent(item.doc_id)}`);
+    if(version!==state.knowledgeVersion)return;
     document.querySelectorAll(".knowledge-item").forEach(b=>b.classList.toggle("active",b===button));
     $("knowledge-content").innerHTML=markdown(detail.text)+`<p class="evidence-source">来源：${esc(detail.source)}</p>`;
     $("knowledge-content").scrollTop=0;
-  }catch(error){notice(error.message);}
+  }catch(error){if(version===state.knowledgeVersion)notice(error.message);}
 }
 async function boot() {
   render();
