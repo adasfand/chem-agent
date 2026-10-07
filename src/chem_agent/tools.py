@@ -76,7 +76,7 @@ class FinalTool(Tool):
         "explanation": {
             "type": "string",
             "nullable": True,
-            "description": "可选补充说明：复合计算问题的概念解释放在这里；不重复数值计算或结果。定量知识说明只能使用本轮已引用片段的逐字原文。缺省为空字符串。",
+            "description": "用户明确要求概念解释时必须填写；否则为空。计算部分由程序生成，把解释写在 answer 会丢失。只解释概念，不重复计算数值。含数值的每一句必须逐字来自本轮已引用原文，可与无数值的说明组合。",
         },
     }
     output_type = "string"
@@ -84,6 +84,11 @@ class FinalTool(Tool):
     def __init__(self, execution: Execution, cancel_event: threading.Event | None = None):
         self.execution = execution
         self.cancel_event = cancel_event
+        if getattr(execution, "requires_explanation", False):
+            self.description += (
+                " 本轮用户明确要求概念解释：完成计算还必须提交非空 explanation，"
+                "并先执行计划内检索、提供真实 citations。只在 answer 中解释不能完成。"
+            )
         super().__init__()
 
     def forward(

@@ -10,7 +10,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from chem_agent.answers import calculation_answer, calculation_explanation
+from chem_agent.answers import (
+    calculation_answer,
+    calculation_explanation,
+    requires_concept_explanation,
+)
 from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.trace import RunTrace, utc_now
@@ -30,6 +34,7 @@ class Execution:
     def __init__(self, knowledge: KnowledgeBase, trace: RunTrace):
         self.knowledge = knowledge
         self.trace = trace
+        self.requires_explanation = requires_concept_explanation(trace.data["question"])
         self.results: dict[str, dict] = {}
         self.functions = {
             "search_knowledge": knowledge.search,
@@ -46,6 +51,14 @@ class Execution:
         if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
             raise ValueError("计划需要包含 1–6 个步骤。")
         parsed = [PlanStep.model_validate(step) for step in steps]
+        if (
+            self.requires_explanation
+            and any(step.tool_name != "search_knowledge" for step in parsed)
+            and not any(step.tool_name == "search_knowledge" for step in parsed)
+        ):
+            raise ValueError(
+                "用户明确要求概念解释；请在计划中加入 search_knowledge，再执行换算或计算。"
+            )
         seen = set()
         for step in parsed:
             if step.step_id in seen or not set(step.depends_on) <= seen:
@@ -238,6 +251,16 @@ class Execution:
                 raise ValueError("回答需要引用本次检索来源。")
             verified_answer = calculation_answer(self.trace.data["calls"])
             if verified_answer is not None:
+                if self.requires_explanation:
+                    if not evidence_ids or not citations:
+                        raise ValueError(
+                            "用户要求概念解释；需要成功检索并引用真实来源，不能仅提交数值。"
+                        )
+                    if not explanation.strip():
+                        raise ValueError(
+                            "用户要求的概念解释尚未提交；请填写 final_answer.explanation，"
+                            "不要把解释仅放在 answer，计算部分由程序生成。"
+                        )
                 extra = calculation_explanation(
                     explanation, self.trace.data["calls"], self.trace.data["evidence"], citations
                 )

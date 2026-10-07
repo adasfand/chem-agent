@@ -252,3 +252,74 @@ def test_partial_or_noncompleted_run_keeps_its_explanation_without_completed_num
     answer = "缺少比热，未完成热负荷计算。"
     assert execution.complete(answer, status, []) == answer
     assert "model_answer" not in execution.trace.data
+
+
+def test_real_quote_and_adjacent_explanation_are_checked_per_sentence(execution):
+    heat(execution, flow=2000)
+    quote = "热负荷是单位时间内传递的热量，SI 单位为瓦特 W，1 W = 1 J/s，因此 1 kW = 1 kJ/s。"
+    concept = "显热热负荷公式适用于无相变、定比热的稳态加热过程，忽略散热、轴功及动能位能变化。"
+    execution.trace.data["evidence"] = [{"chunk_id": "power", "text": "前文；" + quote}]
+    answer = execution.complete("已计算。", "completed", ["power"], quote + concept)
+    assert quote in answer and concept in answer
+    assert "来源原文（power；非本轮计算结果）" in answer
+    assert "补充说明：\n" + concept in answer
+
+
+def test_numeric_sentences_can_quote_separate_actual_sources(execution):
+    heat(execution)
+    power = "1 W = 1 J/s。"
+    temperature = "温差 1℃ = 1 K。"
+    execution.trace.data["evidence"] = [
+        {"chunk_id": "power", "text": power},
+        {"chunk_id": "temperature", "text": temperature},
+    ]
+    answer = execution.complete(
+        "已计算。", "completed", ["power", "temperature"], power + temperature
+    )
+    for citation in ("power", "temperature"):
+        assert f"来源原文（{citation}；非本轮计算结果）" in answer
+
+
+def test_valid_quote_does_not_hide_wrong_numeric_sentence(execution):
+    heat(execution)
+    quote = "1 W = 1 J/s。"
+    execution.trace.data["evidence"] = [{"chunk_id": "power", "text": quote}]
+    with pytest.raises(ValueError, match="热负荷为999千瓦"):
+        execution.complete("已计算。", "completed", ["power"], quote + "热负荷为999千瓦。")
+    assert execution.trace.data["status"] == "running"
+    assert "model_explanation" not in execution.trace.data
+
+
+def test_explicit_explanation_requires_search_before_plan_is_saved(execution):
+    execution.trace.data["question"] = "请把25℃换成K，并解释绝对温度与温差的区别及为什么没有偏移。"
+    execution = Execution(execution.knowledge, execution.trace)
+    assert "本轮用户明确要求" in FinalTool(execution).description
+    with pytest.raises(ValueError, match="加入 search_knowledge"):
+        execution.set_plan([{"step_id": "s1", "goal": "换算", "tool_name": "convert_units"}])
+    assert execution.trace.data["plan"] == []
+    execution.set_plan(
+        [
+            {"step_id": "s1", "goal": "检索温差", "tool_name": "search_knowledge"},
+            {"step_id": "s2", "goal": "换算温度", "tool_name": "convert_units"},
+        ]
+    )
+    found = execution.execute("search_knowledge", "s1", {"query": "绝对温度 温差 区别"})
+    execution.execute("convert_units", "s2", {"value": 25, "from_unit": "degC", "to_unit": "K"})
+    citations = [found["output"]["hits"][0]["chunk_id"]]
+    with pytest.raises(ValueError, match="final_answer.explanation"):
+        execution.complete("温差的偏移会抵消。", "completed", citations)
+    assert execution.trace.data["status"] == "running"
+    explanation = "热力学温度以绝对零度为原点；温差是两个温度状态相减，温标偏移在相减时抵消。"
+    answer = execution.complete("已换算。", "completed", citations, explanation)
+    assert "298.15 K" in answer and explanation in answer
+
+
+def test_knowledge_only_explanation_request_keeps_legacy_final_api(execution):
+    execution.trace.data["question"] = "请解释显热公式原理。"
+    execution = Execution(execution.knowledge, execution.trace)
+    execution.set_plan([{"step_id": "s1", "goal": "检索", "tool_name": "search_knowledge"}])
+    found = execution.execute("search_knowledge", "s1", {"query": "显热公式"})
+    answer = "显热负荷与流量、比热和温差有关。"
+    assert (
+        execution.complete(answer, "completed", [found["output"]["hits"][0]["chunk_id"]]) == answer
+    )
