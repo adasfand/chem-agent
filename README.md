@@ -12,6 +12,19 @@
 
 来源卡不是物性数据库，不能自动填入比热等工况参数。相变、反应热、复杂流程模拟和真实物性查询不在当前范围内。
 
+当前交付版本为 **0.3.1**，按现有七项合同摘要组织实现与验收：[能力映射](docs/CONTRACT_COMPLIANCE.md)、[实际架构](docs/ARCHITECTURE.md)、[全库审查与改造依据](docs/AUDIT_AND_PLAN.md)。系统为一套 Agent 工作流，没有独立多 Agent 协作功能。
+
+## 不用密钥的演示
+
+安装后可以直接执行固定离线流程：
+
+```bash
+uv run python scripts/demo_offline.py
+uv run python scripts/demo_offline.py --flow 2000
+```
+
+真实执行本地资料检索、工具注册表、流量换算、带单位的结果引用和显热计算，分别得到约 **46.44 kW / 92.89 kW**；JSON 和 Markdown 写入忽略目录 `runs/`。记录明确标为 `offline_demo`。此路径不读取密钥，不调用模型或 LightRAG，不证明模型能够自行规划。知识问答及模型驱动的多工具流程按下文配置接收方自己的密钥运行。
+
 ## 安装与启动
 
 需要 Python 3.11–3.13、`uv`；本机使用 Python 3.12。未安装 uv 时可运行 `python -m pip install uv`。首次安装依赖和调用模型需要联网。解压后在含 `pyproject.toml` 的目录执行：
@@ -34,6 +47,8 @@ CHEM_PORT=7865
 
 环境变量优先于 `.env`；直接设置的密钥优先于密钥文件。交付包不含可用密钥，接收方需配置自己的账号。
 
+密钥文件必须在接收方本机存在且可读。若报“无法读取 DEEPSEEK_API_KEY_FILE”，修正本机路径，或清空该项后配置 `DEEPSEEK_API_KEY`；源码包不携带开发机密钥文件。
+
 ```bash
 uv run chem-agent doctor
 uv run chem-agent rag-index
@@ -55,7 +70,49 @@ uv run chem-agent ui
 
 同一浏览器会话通过 Cookie 关联，刷新页面可恢复服务内存中的当前状态。界面每个会话保留最近最多 40 轮，非活动会话闲置 24 小时后过期；服务重启后会话和界面历史不恢复，原始 `runs/` 文件仍保留。整个服务同时处理一个模型任务，忙时再次提交会提示稍后重试。当前面向本机演示，未验证生产多人部署。
 
+页面为每次提交生成请求编号；提交响应丢失时可恢复这次已经结束或仍在执行的结果，手工重试也沿用原编号，避免重复执行。幂等记录只在当前会话最近 40 条历史内有效，重启或会话过期后不保留。
+
+热负荷可以引用前序混合衡算的总流量或组分流量，执行器核对依赖和单位后转换为 `kg/s`。有流量换算依赖时仍须用 `$ref`，避免重新抄写数值。
+
 取消会阻止后续工具调用；已经发出的模型请求可能等待返回或超时，其响应不会继续触发工具。单次请求超时默认 60 秒，可用 `CHEM_REQUEST_TIMEOUT` 调整。失败或取消前已经成功的步骤保留供复核，不表示整个任务成功。
+
+## Docker 与接口
+
+需要 Docker 和 Compose。镜像固定基础镜像摘要、按 `uv.lock` 安装依赖、以非 root 用户运行。Compose 从项目 `.env` 读取**直接密钥** `DEEPSEEK_API_KEY`，宿主机密钥文件路径不会自动挂入容器。无密钥也能启动页面和健康检查，模型任务会明确失败；也可在容器执行离线演示。
+
+```bash
+docker compose up --build -d
+curl http://127.0.0.1:7860/health
+docker compose exec chem-agent python scripts/demo_offline.py
+# 启用真实图谱（需要密钥，会下载模型并消耗 API 额度）
+docker compose exec chem-agent chem-agent rag-index
+docker compose down
+```
+
+端口默认为 `7860`；`.env` 中的 `CHEM_PORT` 只改变宿主机映射端口，容器内部固定为 `7860`。命名卷分别保存记录、索引和向量模型缓存，down 不删除它们。镜像构建上下文与源码包都不包含 `.env`、本机索引、模型缓存或私有记录。
+
+| 接口 | 用途 |
+|---|---|
+| `GET /health` | 服务存活、版本、密钥配置布尔值和检索后端；不分配 Cookie，不验证远端认证/余额 |
+| `GET /api/bootstrap`、`GET /api/session` | 页面资料/示例/索引状态与当前会话历史 |
+| `POST /api/jobs` | `question`（1–4000字）、可选 `parent_job_id`、可选32位小写十六进制 `client_request_id`；返回202 |
+| `GET /api/jobs/{job_id}` | 当前状态、计划、实际调用与证据；轮询到 finished |
+| `POST /api/jobs/{job_id}/cancel` | 请求取消当前会话任务 |
+| `GET /api/jobs/{job_id}/report.md`、`trace.json` | 下载终态报告/追溯；未结束返回409 |
+| `GET /api/knowledge/{doc_id}` | 查看实际知识卡 |
+
+API 为本机工作台服务；同会话用 Cookie，写入请求须提供与访问地址相同的 Origin。相同请求编号和相同输入返回原任务；复用编号修改输入返回409。422表示输入格式错误，404表示任务/资料不存在或不属于当前会话，403表示访问地址/Origin不允许。每个响应含 `X-Request-ID`；日志只记录路由、编号、状态和延迟，不记录问题正文。
+
+```bash
+mkdir -p .local
+curl -c .local/api-cookies.txt http://127.0.0.1:7860/api/bootstrap
+curl -b .local/api-cookies.txt -H 'Origin: http://127.0.0.1:7860' \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"请将2.5 MPa换算成kPa。","client_request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' \
+  http://127.0.0.1:7860/api/jobs
+```
+
+用返回的 job_id 查询结果。每个新输入需使用新的 client_request_id；示例的固定编号用于演示重试。
 
 ## 常用命令
 
@@ -88,6 +145,8 @@ uv run chem-agent run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无
 
 模型请求证据省略私密推理，已知密钥会脱敏。记录仍可能含用户输入及业务数据，分享前应检查；脱敏不等于自动识别全部敏感业务信息。
 
+运行模式区分模型驱动的 `live`、固定离线演示的 `offline_demo`，以及模型尚未开始的 `not_started`。无密钥等启动失败可以导出记录，但不作为真实模型验证；请求次数以 JSON 中保存的实际记录为准。
+
 ```text
 src/chem_agent/       模型、执行器、计算、检索、API 与报告导出
 src/chem_agent/web/   浏览器工作台 HTML/CSS/JavaScript
@@ -100,12 +159,16 @@ docs/validation/     随包提供的验证证据
 
 知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改资料后运行 `rag-index` 重建 LightRAG 索引；运行 `index` 更新离线资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。交付包排除 `.env`、`.venv`、`.local`、`build/` 和原始 `runs/`。选型、来源及证据边界见[检索与工具链升级说明](docs/检索与工具链升级.md)。
 
+同一相对位置不得同时存在同 stem 的 `.md` / `.txt` 文件，避免重复文档与引用编号。索引校验包含向量解码、维度、记录匹配、有限值和完整 GraphML 解析；LightRAG 的共享存储按目录及资料版本隔离，保留0.3.0已有磁盘结构。
+
 ## 验证范围
+
+`0.3.1` 的当前结果见[交付验证清单](docs/validation/v0.3.1/checks.json)，包含本轮离线回归、真实 SDK 的离线存储/查询适配、HTTP 冒烟、Docker 和独立源码复装。API→真实 Agent 循环→检索/计算→导出冒烟只替换模型响应，不伪装为真实模型调用。2026-10-07 已修正搬迁后失效的本机密钥文件路径，并完成一次真实单位换算：2.5 MPa → 2500 kPa，4 次 DeepSeek 请求全部成功。完整 8 案例和 LightRAG 质量复验尚未重跑；下列旧版真实记录按其版本保留。
 
 `0.3.0` 在 macOS/Python 3.12 上通过 **174 项 Python 离线测试、15 项前端状态测试**、Ruff 检查、格式检查、JavaScript 语法检查和离线锁定依赖安装。实际使用 DeepSeek 从 21 张资料卡构建中文 LightRAG 索引，生成 21 个片段、180 个实体和 235 条关系。真实 `mix` 检索返回中文实体、关联关系及原文片段；10 份图谱支撑片段中有 7 份不在本轮前 3 个命中内，工作台会单独标明并提供原文和出处。浏览器中的显热样例经检索、单位换算、计算三个工具步骤得到 **46.4444 kW**，计算实际引用上一步 `s2.value`。
 
-本版浏览器检查覆盖默认视口和 `390×796` 窄屏，确认路径中的实体关系、可点开的官方来源、实际工具调用和单位换算引用可见。索引与向量模型缓存在本机忽略目录，不包含于源码包；索引目录和查询缓存采用本机私有权限，索引残缺时会显式退回词法检索。新环境需配置模型服务后执行一次 `rag-index`。图谱关系是检索线索，并非物性数据的实验验证。
+`0.3.0` 的历史浏览器检查覆盖默认视口和 `390×796` 窄屏，确认路径中的实体关系、可点开的官方来源、实际工具调用和单位换算引用可见。索引与向量模型缓存在本机忽略目录，不包含于源码包；索引目录和查询缓存采用本机私有权限，索引残缺时会显式退回词法检索。新环境需配置模型服务后执行一次 `rag-index`。图谱关系是检索线索，并非物性数据的实验验证。
 
-本版实测细节见[0.3.0 检查记录](docs/validation/v0.3.0/checks.json)。`0.2.0` 的 157 项 Python 测试、12 项前端测试、三轮 DeepSeek 任务及界面截图保留在[历史检查记录](docs/validation/v0.2.0/checks.json)；其结果不充当本版 RAG 的证据。
+`0.3.0` 实测细节见[该版检查记录](docs/validation/v0.3.0/checks.json)。`0.2.0` 的 157 项 Python 测试、12 项前端测试、三轮 DeepSeek 任务及界面截图保留在[历史检查记录](docs/validation/v0.2.0/checks.json)；其结果不充当当前 RAG 的新验证证据。
 
 未验证 Windows、完全离线模型、生产多人部署及未收录主题的准确率。工具输入仍需与用户给定参数核对。
