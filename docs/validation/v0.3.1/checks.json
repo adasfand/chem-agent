@@ -86,26 +86,50 @@
     "build_context_boundary": "actual scratch build --network=none; recursive and case-insensitive MD/TXT retained, unsupported attachments and nested private/cache directories excluded"
   },
   "live_current": {
-    "status": "passed_minimal_smoke",
+    "status": "passed_core_acceptance_with_quality_findings",
     "verified_on": "2026-10-07",
-    "cause_of_prior_configuration_failure": "Configured key-file path referred to a project that had moved; local ignored configuration corrected.",
+    "tested_code_commit": "877f95db4ff63ef0f40d217cd03f07e8c8a1080b",
     "model": "deepseek-v4-pro",
-    "cases": [
-      {
-        "case": "unit_conversion",
-        "question": "2.5 MPa -> kPa",
-        "status": "completed",
-        "value": 2500.0,
-        "unit": "kPa",
-        "run_id": "20261007T104945-72b1943b77"
-      }
+    "minimal_key_verification": {
+      "status": "passed_minimal_smoke",
+      "verified_on": "2026-10-07",
+      "cause_of_prior_configuration_failure": "Configured key-file path referred to a project that had moved; local ignored configuration corrected.",
+      "model": "deepseek-v4-pro",
+      "cases": [
+        {
+          "case": "unit_conversion",
+          "question": "2.5 MPa -> kPa",
+          "status": "completed",
+          "value": 2500.0,
+          "unit": "kPa",
+          "run_id": "20261007T104945-72b1943b77"
+        }
+      ],
+      "model_requests": 4,
+      "successful_model_requests": 4,
+      "trace": "20261007T104945-72b1943b77.json",
+      "report": "live-unit-report.md",
+      "complete_eight_case_suite": "not_rerun",
+      "lightrag_quality_regression": "not_rerun",
+      "credentials_in_delivery": false
+    },
+    "complete_eight_case_suite": "passed_current_lexical",
+    "lightrag_focused_acceptance": "passed_three_current_code_cases_using_matching_retained_index",
+    "lightrag_general_quality_benchmark": "not_run",
+    "cases_passed": 11,
+    "cases_failed": 0,
+    "main_agent_requests": 47,
+    "successful_main_agent_requests": 47,
+    "sdk_keyword_requests_observed": 3,
+    "recovered_guard_errors": 6,
+    "manual_quality_findings": [
+      "Rounded intermediate mass flows are displayed with exact equal signs; actual calculations use full precision.",
+      "Some heat answers omit steady-state or no-reaction assumptions that remain present in tool outputs and evidence.",
+      "Graph descriptions combine multiple sources; each source does not support every clause."
     ],
-    "model_requests": 4,
-    "successful_model_requests": 4,
-    "trace": "20261007T104945-72b1943b77.json",
-    "report": "live-unit-report.md",
-    "complete_eight_case_suite": "not_rerun",
-    "lightrag_quality_regression": "not_rerun",
+    "summary": "live-regression-summary.json",
+    "evidence": "live-regression-evidence.json",
+    "report": "live-regression-report.md",
     "credentials_in_delivery": false
   },
   "delivery": {
@@ -199,7 +223,7 @@
     "No Windows, production multiuser or general retrieval accuracy benchmark.",
     "LightRAG workspace adaptation is pinned to 1.5.7 and has real SDK offline regressions.",
     "Original scanned contract has not been obtained; engineering scope uses the preserved seven-item source summary.",
-    "Only the current unit-conversion live smoke was rerun; full eight-case suite and live LightRAG quality were not rerun."
+    "Focused 11-case live acceptance passed; answer rounding/assumption presentation and graph per-claim support granularity still require improvement; no broad live retrieval benchmark."
   ],
   "branch": "codex/delivery-hardening",
   "provenance": "Resumed existing uncommitted 0.3.1 work from the primary directory in an independent worktree; primary code and records preserved",
