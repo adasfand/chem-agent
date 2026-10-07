@@ -1,0 +1,159 @@
+{
+  "version": "0.3.2",
+  "verified_on": "2026-10-07",
+  "platform": "macOS / Python 3.12.14 / Node 24.19.0",
+  "branch": "codex/delivery-hardening",
+  "offline": {
+    "pytest": {
+      "passed": 361,
+      "failed": 0,
+      "skipped": 0,
+      "warning": "Existing Starlette/AnyIO BlockingPortal deprecation"
+    },
+    "node_state_tests": {
+      "passed": 21,
+      "failed": 0
+    },
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "javascript_syntax": "passed",
+    "git_diff_check": "passed",
+    "uv_sync_locked_offline": "passed",
+    "docker_context_check": "Actual scratch build --network=none passed in pytest"
+  },
+  "live": {
+    "complete_suite_passed": 10,
+    "focused_cases_passed": 3,
+    "accepted_main_agent_requests": 56,
+    "complete_suite_tested_code": {
+      "commit": "956767dbfdd48da063876c50db59791a215ec632",
+      "dirty": false,
+      "source_sha256": "8bd50e133f31c712fc4d6b7d63cdd89df33baf7c43aa1700dfa8380a58b4c9ed",
+      "files": 18
+    },
+    "focused_tested_code": {
+      "commit": "6b232b471a01d5dc6880c2e17c1bba9f36e0f5c2",
+      "dirty": false,
+      "source_sha256": "21553dd5c477bc2f72dc71a230de4ed59e22facfe98e910494cd868b256250b3",
+      "files": 18
+    },
+    "all_rounds_main_agent_requests": 168,
+    "failed_provider_request_count": 1,
+    "summary": "live-regression-summary.json",
+    "evidence": "live-regression-evidence.json",
+    "report": "live-regression-report.md",
+    "actual_backend": "lightrag",
+    "knowledge_version": "70991c947a1369d67bc9b593eafd8d0b7fbcf9b136dc40af5b1ff58fde396d68",
+    "saved_complete_suite_recheck": "passed, no new model calls"
+  },
+  "manual_review": {
+    "complete_suite": "passed scoped numeric results, full assumptions, actual references, compound temperature explanation and source identity",
+    "source_records_checked_full_suite": 71,
+    "source_records_checked_focused_cases": 21,
+    "limits": "Source identity is verified; semantic support for every clause is not automatically proven"
+  },
+  "browser": {
+    "mode": "saved_record_replay",
+    "new_model_calls": 0,
+    "source_run_id": "20261007T141255-e9aa9ca959",
+    "graph_collection_labels": "passed",
+    "screenshot": [
+      "graph-source-labels-replayed.jpg",
+      "entity-source-labels-replayed.jpg"
+    ]
+  },
+  "delivery": {
+    "archive": "chem-agent-demo-0.3.2.zip",
+    "archive_boundaries": "passed",
+    "independent_source_check": "passed: fresh virtual environment from ZIP, locked offline install with preexisting Python 3.12.14 and warm shared cache; no credentials copied",
+    "current_container_runtime": "not rebuilt; complete v0.3.1 container/clean-install evidence remains historical",
+    "verified_source_sha256": {
+      "data/knowledge/01_sensible_heat.md": "8d76ebff0c25b643b16092c8eb9a11061801f2108f1ac52ef83c55a722e2b0c5",
+      "data/knowledge/02_heat_assumptions.md": "dc96a686b654d26d039933e55127f26cf12af64be9e4782a8c83d7747a9d31cc",
+      "data/knowledge/03_mass_flow.md": "f8f16cae24127524c9ddb3197fa6706049a819866b26687f955b3cd46b208ff9",
+      "data/knowledge/04_temperature_difference.md": "650f05832984ecf8d209c0faafa32a2a9dd4a5605b59b16200cc9abac40d2776",
+      "data/knowledge/05_units_dimensions.md": "967d9519fb1487c18255177558d42f99a1557d3226e387fc2d3544e60b6b3812",
+      "data/knowledge/06_specific_heat.md": "5a3442c4e3df9c024e4cf8f5a0d771c096a825d91072b73a8bf554154cb839b2",
+      "data/knowledge/07_mass_fraction.md": "f6519e4819468f984b4926a2ea1a08bcc02f9019c59398a3871e21a4aad8b221",
+      "data/knowledge/08_total_mass_balance.md": "bcaf22b5df40e10a3d52a3a2aa4cdfcbaa94a3386a7231110be9fd424bd871d3",
+      "data/knowledge/09_component_balance.md": "c5e58aae71342e58af6b411bf9264f01d61bba6f5d4c44d3296bd50dbc2184ba",
+      "data/knowledge/10_mixing_balance.md": "e05bac209210e0af03777b04288db086e36535880677b2084316c7db2ea60ef7",
+      "data/knowledge/11_dilution.md": "87cf55e634158b165a107a32e91568303adbf8e40f542110b759f118179766e5",
+      "data/knowledge/12_mass_volume.md": "0de46dfeff8f2c6e85927ff2250981d84b9bc789e443dc6c7e3f7d69f74c5269",
+      "data/knowledge/13_missing_inputs.md": "8979f1ebaafb37188b0de7b230487051a1b248a0ebdd9a0d49976109f665d849",
+      "data/knowledge/14_result_checks.md": "207a732ea3221c1b4c25965fe78f246a6d7805f16defc60be42de1392b23c611",
+      "data/knowledge/15_retrieval_provenance.md": "fb26fcd141eccb4bf09444c0c87a51f2ffda85360693980a8490012debff6617",
+      "data/knowledge/16_bipm_temperature_interval.md": "59a0eeeb73f77910eb337ba7afa67980d5ba56a4bc35a272189529bd14a73159",
+      "data/knowledge/17_bipm_heat_power_units.md": "fb931bcfdeec8b81de7f60d1f755449d6c29d56c82880f2271b99f91e42b89f2",
+      "data/knowledge/18_iupac_concentration_basis.md": "16cbfdabe3bbee4754848c260089fbd44a167465194c3474efeef49101e24696",
+      "data/knowledge/19_iupac_heat_capacity_basis.md": "d964ddf388adc10a507b8243c75b4bf8ef7a1d9bfe18c533b8def5846cf3a277",
+      "data/knowledge/20_nist_water_vapor_heat_capacity.md": "8ee1dcc22377d72b86c90bc620ddc61d3db29521aeee86c4441502b48ad1ee89",
+      "data/knowledge/21_mit_two_stream_mixing.md": "c11a4e41c53a12ce1790d2096b60780b156b466574828778749fbb36ef13ef03",
+      "examples/tasks.json": "e8aa56c726c2d56b6c3f5cd6c3c8199a3712deea198a12bb76be8cc1c854d173",
+      "scripts/demo_offline.py": "4d1eecbd2de2d5db2239c1143dd5ca10e79db6b3f41546faa03c6ec441f6377c",
+      "scripts/package.py": "6070f9930fcda09eaee5c34f910208a17e21b207c996b1f05e267796f7f9d465",
+      "scripts/validate_live.py": "f0fffb769cf043bb38acad8a67a81b3b8b5b6e597b4f5c22a9a8d702b92bbbc8",
+      "src/chem_agent/__init__.py": "30b5b19842aa1ac7a68294c4fbaa016f08ab23a73c8929b24765d2438eefb5fb",
+      "src/chem_agent/agent.py": "863526ac109ad296a4d5fef7a1adca5031cf6624cfdeb947e3e98d71857b6bf8",
+      "src/chem_agent/answers.py": "366bcb1b9d39339121d419b0c12ba50fa5ba973bc2e28ce6d05f3dbfc5ca35d2",
+      "src/chem_agent/calculations.py": "8e37c6de8fa2b43f260d592733fece0dc584b16e5e8f3fc9afa095eb2c27981d",
+      "src/chem_agent/cli.py": "f6c5b96a226d9bafc64751fd940a071fbf3a738c8f5b62facabf970db3f3d6c1",
+      "src/chem_agent/config.py": "5a208b31c004991aff302a7b0848c2c60f99a21f70047f5b24a7fc5b9cedd215",
+      "src/chem_agent/execution.py": "cdd9c63c46d4d40d2fbb57fd3a57dfce08a6ba23ea563da6bbb6ed6051fa5911",
+      "src/chem_agent/inputs.py": "69eb1ca4e627fface9e71d38aa695e9db927ffa55d590596efe95b36ce57d2ab",
+      "src/chem_agent/knowledge.py": "27925528a07e582e8e4894f2260d88c664b6e3642dacfcfb3f2884dea37fcf7a",
+      "src/chem_agent/model.py": "5b1587b09cfd64677a75138845284b258621b12cf73c84ee497203cab9f3afdc",
+      "src/chem_agent/report.py": "30c5923c96c6763a99323c5dc052ee577764101a902dbd1cf12b95a32f3110d2",
+      "src/chem_agent/retrieval.py": "04c71e63ddc60bbf538f28216ffb4164700d359ff2c28eb098543987e51d7ec8",
+      "src/chem_agent/tools.py": "3293167b096394565f3ce257dbe2197a534db1efa9c004f0155847fc790acf15",
+      "src/chem_agent/trace.py": "0545acbe804476bc11f4a7964d0e4cd9d50d82438816edcd497002355bee0e6e",
+      "src/chem_agent/ui.py": "c45e805abaeaac8b172931f193d9ad05bbc22297fc1dd1c62cb727394fb67d6d",
+      "src/chem_agent/web/app.js": "7fe3a6a7292dd02d9ed4c82f7a2ab5c837a18dff54960f629ca13825ff86e08d",
+      "src/chem_agent/web/index.html": "3e06e55754399c3fceee969cca9806e65e40618973c37047e6c34c81f879aff4",
+      "src/chem_agent/web/style.css": "81e5f594efb9e94d821261f43c170941bf54b90502ba54d17276629d242d4ce0",
+      "tests/frontend_state.test.cjs": "f7f099f9ae7de51d3c0ee0ad953dc9a834a9829fb1267d12a071fed179fa7e85",
+      "tests/test_agent.py": "13a113ad9d67e9e7a6b6bc66bac8353c69ad28ec265316b0e05eb8c05b86c12e",
+      "tests/test_answers.py": "9c319daa478933b1ea6e62e2cde470d19cd61aae8132433c19cca4429a832147",
+      "tests/test_calculations.py": "2d45df14f401480e8cbc46fcbc6e17960d697265b89a7eb478ead7de62f799db",
+      "tests/test_cancellation.py": "a8a03499e0d6e3bf01e70ac09c885036a5f55344bf416e958acaeacb95c062cf",
+      "tests/test_config_trace.py": "54b8f05f4eb7075721806c88f13aabcc36d07d9823d5cd574dcd4f5ba2b1d09d",
+      "tests/test_container.py": "27c15d75fc253f1cef25f093f57f4748a6d35af1d96b3db12b7b0e9983521fcf",
+      "tests/test_delivery.py": "686b714f7684f21a2b46446a5e62a3610b3d9efc2e21fb7d6028f4c1f6ccbcae",
+      "tests/test_execution.py": "e3e63fddf90a56a76e7532a7695d019823c92ba6ee7e58403ba23b58a2f238ba",
+      "tests/test_execution_review.py": "ad820bdb05c7f6de6294f016d134734b7a9bd82406250e8bd91882f35bd807d5",
+      "tests/test_graph_sources.py": "214638ac06ac8ed40680cc7be2eaa17134ff5c1e1d4cdb0bb83e5264fd8a7662",
+      "tests/test_inputs.py": "23f4a6544584681f0e553c8ee412fb386dc3c77bed13b9e40b69b4a509cdadd6",
+      "tests/test_knowledge.py": "7dcc4bdda16e0dd2637f65b82b947a483412d0c43cba63d2ba675334ba61638e",
+      "tests/test_live_validation.py": "79410c2d5b7c5b42d8dfa9c758d2284b4097e4977641a2a2f9a344df159b7cce",
+      "tests/test_model.py": "8372853acc56777de661eb714f3e1affd65af969a032861b9766ace3a559b774",
+      "tests/test_report.py": "d8fc6f16b54f31a42429906a68ec31eaa3528d6de74e7ffcecfa9b20687c0086",
+      "tests/test_retrieval.py": "69da0c901605f447262c971e2ef5e6364ac1fabd565f2c5ace98cc88c4e61ede",
+      "tests/test_smoke.py": "3a3645d060f92a23882cf4fa72c3a0f844af9198e236b737f532e8baf66ba188",
+      "tests/test_ui_api.py": "3c2509a900a19332bd9989f4c08ba195cacb8aef5a7f3519722fc2ad8db10b70",
+      "pyproject.toml": "932505d7d00f6844dc949ef6a55bde7e5d64b71d3e34e67803f12d94d3e34777",
+      "uv.lock": "ed6d963700af20baff78bcceb5ce1bda0c174374dd63efdeff000bdecba2e2e9",
+      "Dockerfile": "337a52cacf1c6a37bcc76e6a5b3a17b0217c0ddc10d53c7f72d07bf0a340693b",
+      "compose.yaml": "e2630a70b08a1c1c1b1920388633b1e08481e0fd59ebd1245fe503107f0770e4",
+      ".dockerignore": "408a29f927871db7539d4181cfb3a6cdb564c9482d18eab6df5a7a60176aae5b"
+    },
+    "independent_source_tests": {
+      "passed": 361,
+      "failed": 0,
+      "skipped": 0
+    },
+    "independent_frontend_tests": {
+      "passed": 21,
+      "failed": 0
+    },
+    "independent_doctor_changed_input_demo": "passed; no configured key; 2000 kg/h gives 92.8888888889 kW",
+    "independent_archive_runtime_test_data_hashes": "passed; every recorded non-documentation source hash matched the extracted archive",
+    "independent_install_note": "UV interpreter discovery initially failed in isolated PATH; explicitly selected the existing verified Python interpreter, then locked offline installation passed. Not a new operating-system validation.",
+    "final_archive_source_hash_match": "passed; final regeneration verified against every recorded runtime, test, script, knowledge, example, dependency and container source hash"
+  },
+  "remaining_limits": [
+    "Full ten-case suite tested 956767d; final withdrawal/unknown guard patch 6b232b4 was covered by offline regressions and three focused actual cases.",
+    "The focused retry was dirty only because documentation/screenshots were pending; actual runtime source SHA256 equals the initial focused run.",
+    "One provider request failed before the single-case retry; retained as a failed attempt.",
+    "Explicit capacity declaration matching is narrow; arbitrary prose attribution and per-claim semantic citation support require human review."
+  ]
+}
