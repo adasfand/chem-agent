@@ -11,7 +11,7 @@ DESCRIPTIONS = {
     "search_knowledge": '检索本地化工资料；索引就绪时使用 LightRAG 图谱与向量混合检索。arguments={"query":"显热公式适用条件","top_k":3}。返回 hits 的 chunk_id 用于引用；retrieval 包含本轮实际实体、关系和片段。无命中时可用新查询重试同一步；依赖它的步骤被阻断，不能声明整轮完成。命中不代表事实正确，无相关资料时不能编造来源。',
     "convert_units": '换算兼容量纲的常用单位。arguments={"value":1000,"from_unit":"kg/h","to_unit":"kg/s"}。返回 value、unit。温差用 delta_degC、delta_K；绝对温度用 degC、K。',
     "calc_heat_duty": '计算单相恒比热显热负荷。arguments={"mass_flow_kg_s":{"$ref":"s2.value"},"specific_heat_kj_kg_k":4.18,"delta_t_k":40}。比热必须由用户给出，不能查表代填。温差可由明确起止温度作差。若依赖换算步骤，质量流量必须使用 $ref。返回 heat_duty_kw、inputs、assumptions。',
-    "calc_mass_balance": '稳态无反应混合衡算。arguments={"streams":[{"flow_kg_h":100,"mass_fraction":0.05},{"flow_kg_h":400,"mass_fraction":0}]}。质量分数必须在0..1，百分数5%写0.05；纯水中盐分数为0。禁止将摩尔分数当质量分数。返回 total_flow_kg_h、component_flow_kg_h、mass_fraction。',
+    "calc_mass_balance": '稳态无反应混合衡算。arguments={"streams":[{"flow_kg_h":100,"mass_fraction":0.05},{"flow_kg_h":400,"mass_fraction":0}]}。质量分数必须在0..1，百分数5%写0.05；纯水中盐分数为0。禁止将摩尔分数当质量分数。返回 total_flow_kg_h、component_flow_kg_h、mass_fraction，不返回 value。后续引用混合总流量使用 {"$ref":"s2.total_flow_kg_h"}（s2为实际混合步骤编号）。',
 }
 
 
@@ -73,6 +73,11 @@ class FinalTool(Tool):
             "description": "completed/needs_input/no_evidence/failed/out_of_scope 五者之一。",
         },
         "citations": {"type": "array", "description": "真实 chunk_id 字符串列表；未检索时为空。"},
+        "explanation": {
+            "type": "string",
+            "nullable": True,
+            "description": "可选补充说明：复合计算问题的概念解释放在这里；不重复数值计算或结果。定量知识说明只能使用本轮已引用片段的逐字原文。缺省为空字符串。",
+        },
     }
     output_type = "string"
 
@@ -81,9 +86,11 @@ class FinalTool(Tool):
         self.cancel_event = cancel_event
         super().__init__()
 
-    def forward(self, answer: str, status: str, citations: list[str]) -> str:
+    def forward(
+        self, answer: str, status: str, citations: list[str], explanation: str | None = ""
+    ) -> str:
         check_cancelled(self.cancel_event)
-        return self.execution.complete(answer, status, citations)
+        return self.execution.complete(answer, status, citations, explanation)
 
 
 def make_tools(execution: Execution, cancel_event: threading.Event | None = None) -> list[Tool]:

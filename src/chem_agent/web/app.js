@@ -149,10 +149,10 @@ function graphSourceCard(id, source, hitIds) {
   const title=source.title||source.chunk_id||id;
   const preview=chunkPreview(source.text);
   const alsoHit=hitIds.has(id);
-  return `<details class="graph-source-card"><summary><span>${esc(title)}</span><em>${alsoHit?"图谱支撑 · 同时命中":"图谱支撑 · 非命中"}</em></summary><p class="graph-source-excerpt">${esc(preview.slice(0,200))}${preview.length>200?"…":""}</p><p class="graph-source-origin">来源：${sourceLabel(source)}</p><small>片段编号 ${esc(id)}</small>${source.text?`<div class="graph-source-original"><span>原文</span><article class="prose">${markdown(source.text)}</article></div>`:"<p>索引没有提供原文。</p>"}</details>`;
+  return `<details class="graph-source-card"><summary><span>${esc(title)}</span><em>${alsoHit?"索引关联 · 同时命中":"索引关联 · 非命中"}</em></summary><p class="graph-source-excerpt">${esc(preview.slice(0,200))}${preview.length>200?"…":""}</p><p class="graph-source-origin">来源：${sourceLabel(source)}</p><small>片段编号 ${esc(id)}</small>${source.text?`<div class="graph-source-original"><span>原文</span><article class="prose">${markdown(source.text)}</article></div>`:"<p>索引没有提供原文。</p>"}</details>`;
 }
 function graphSourceCards(ids, graphSources, hits) {
-  if(!ids.length)return '<p class="graph-source-missing">图谱未返回来源编号，无法追溯该节点的原文。</p>';
+  if(!ids.length)return '<p class="graph-source-missing">索引未返回来源编号，无法核对该实体或关系的关联原文。</p>';
   const byId=new Map(graphSources.map(source=>[String(source.chunk_id||""),source]));
   const hitIds=new Set(hits.map(hit=>String(hit.chunk_id||"")));
   return `<div class="graph-source-list">${ids.map(id=>graphSourceCard(id,byId.get(id),hitIds)).join("")}</div>`;
@@ -187,14 +187,14 @@ function retrievalCard(call, index, citations) {
   const mode=data.mode||"未标注";
   const high=list(data.keywords?.high_level), low=list(data.keywords?.low_level);
   const keywords=(high.length||low.length)?`<div class="keyword-groups">${high.length?`<div><small>主题词</small>${high.map(word=>`<span>${esc(word)}</span>`).join("")}</div>`:""}${low.length?`<div><small>细节词</small>${low.map(word=>`<span>${esc(word)}</span>`).join("")}</div>`:""}</div>`:"<p class=\"path-muted\">本轮没有返回关键词。</p>";
-  const relationRows=relationships.length?`<details class="graph-relations"><summary>查看 ${relationships.length} 条返回的关系及其来源</summary><ul>${relationships.map(rel=>`<li><strong>${esc(rel.source||rel.src_id||"?")}</strong><span>→</span><strong>${esc(rel.target||rel.tgt_id||"?")}</strong>${relationDescription(rel.description)}<div class="graph-source-label">关系支撑片段 · ${sourceIds(rel).length}</div>${graphSourceCards(sourceIds(rel),graphSources,hits)}</li>`).join("")}</ul></details>`:"";
+  const relationRows=relationships.length?`<details class="graph-relations"><summary>查看 ${relationships.length} 条返回的关系及其关联来源</summary><ul>${relationships.map(rel=>`<li><strong>${esc(rel.source||rel.src_id||"?")}</strong><span>→</span><strong>${esc(rel.target||rel.tgt_id||"?")}</strong>${relationDescription(rel.description)}<div class="graph-source-label">关系关联来源集合 · ${sourceIds(rel).length}</div>${graphSourceCards(sourceIds(rel),graphSources,hits)}</li>`).join("")}</ul></details>`:"";
   const refsByChunk=new Map(references.map(ref=>[String(ref.chunk_id||ref.reference_id||""),ref]));
   const selectedIndex=state.selectedEntity?.queryIndex===index?Math.min(state.selectedEntity.entityIndex,entities.length-1):0;
   const selected=entities[selectedIndex];
   const linked=selected?relatedChunks(selected,hits):[];
   const activeIds=new Set(linked.map(chunk=>String(chunk.chunk_id||chunk.reference_id||chunk.id||"")));
-  const details=selected?`<div class="entity-detail"><small>实体详情 · ${esc(selected.type||selected.entity_type||"未分类")}</small><strong>${esc(selected.name||selected.entity_name||selected.id||"未命名实体")}</strong>${entityDescription(selected.description)}<div class="entity-links">${linked.length?`关联本轮命中片段：${linked.map(chunk=>esc(chunk.title||chunk.document_title||chunk.chunk_id||"片段")).join("、")}`:"该实体没有明确关联到本轮命中片段；下方图谱支撑资料可能来自索引中的其他片段。"}</div><div class="graph-source-label">实体支撑片段 · ${sourceIds(selected).length}</div>${graphSourceCards(sourceIds(selected),graphSources,hits)}</div>`:"";
-  const graphSourceIndex=graphSources.length?`<details class="graph-source-index"><summary>全部图谱支撑资料 · ${graphSources.length} 份（含非命中片段）</summary>${graphSourceCards([...new Set(graphSources.map(source=>String(source.chunk_id||"")).filter(Boolean))],graphSources,hits)}</details>`:"";
+  const details=selected?`<div class="entity-detail"><small>实体详情 · ${esc(selected.type||selected.entity_type||"未分类")}</small><strong>${esc(selected.name||selected.entity_name||selected.id||"未命名实体")}</strong>${entityDescription(selected.description)}<div class="entity-links">${linked.length?`关联本轮命中片段：${linked.map(chunk=>esc(chunk.title||chunk.document_title||chunk.chunk_id||"片段")).join("、")}`:"该实体没有明确关联到本轮命中片段；下方索引关联来源可能包含其他片段。"}</div><div class="graph-source-label">实体关联来源集合 · ${sourceIds(selected).length}</div>${graphSourceCards(sourceIds(selected),graphSources,hits)}</div>`:"";
+  const graphSourceIndex=graphSources.length?`<details class="graph-source-index"><summary>全部索引关联来源 · ${graphSources.length} 份（含非命中片段）</summary>${graphSourceCards([...new Set(graphSources.map(source=>String(source.chunk_id||"")).filter(Boolean))],graphSources,hits)}</details>`:"";
   const chunkRows=chunks.length?chunks.map((chunk,i)=>{
     const id=String(chunk.chunk_id||chunk.reference_id||chunk.id||`片段 ${i+1}`);
     const source=refsByChunk.get(id)||chunk;
@@ -204,7 +204,7 @@ function retrievalCard(call, index, citations) {
   }).join(""):"<div class=\"path-empty\">本轮检索没有返回片段。</div>";
   const independent=references.filter(ref=>!chunks.some(chunk=>String(chunk.chunk_id||chunk.reference_id||chunk.id||"")===String(ref.chunk_id||ref.reference_id||"")));
   const independentSources=independent.length?`<details class="path-references"><summary>另有 ${independent.length} 条来源记录</summary><ul>${independent.map(ref=>`<li>${esc(ref.chunk_id||ref.reference_id||"来源")} · ${sourceLabel(ref)}</li>`).join("")}</ul></details>`:"";
-  return `<section class="retrieval-card"><div class="path-query"><span class="path-node-index">${String(index+1).padStart(2,"0")}</span><div><small>检索查询 · ${esc(mode)}</small><strong>${esc(query)}</strong></div><span class="path-count">${hits.length} 命中</span></div><div class="path-branch"><div class="path-branch-head"><span>01 · 查询展开</span><span>02 · 实体关系与支撑资料</span><span>03 · 本轮命中片段</span></div><div class="path-keywords">${keywords}</div><div class="path-entities">${entityMap(entities,relationships,index,selectedIndex)}${details}${relationRows}${graphSourceIndex}</div><div class="path-chunks">${chunkRows}${independentSources}</div></div></section>`;
+  return `<section class="retrieval-card"><div class="path-query"><span class="path-node-index">${String(index+1).padStart(2,"0")}</span><div><small>检索查询 · ${esc(mode)}</small><strong>${esc(query)}</strong></div><span class="path-count">${hits.length} 命中</span></div><div class="path-branch"><div class="path-branch-head"><span>01 · 查询展开</span><span>02 · 实体关系与关联来源</span><span>03 · 本轮命中片段</span></div><div class="path-keywords">${keywords}</div><div class="path-entities">${entityMap(entities,relationships,index,selectedIndex)}${details}${relationRows}${graphSourceIndex}</div><div class="path-chunks">${chunkRows}${independentSources}</div></div></section>`;
 }
 function toolOutput(call) {
   if(!call)return "尚未调用";
@@ -232,7 +232,7 @@ function pathView(result) {
   const searches=list(result.calls).filter(call=>call.tool_name==="search_knowledge" && call.output);
   const citations=new Set(result.citations||[]);
   const retrieval=searches.length?searches.map((call,index)=>retrievalCard(call,index,citations)).join(""):'<div class="path-empty">本轮没有知识检索调用。计算任务仍可在下方查看工具执行链。</div>';
-  return `<div class="path-view"><p class="path-intro">节点与关系来自本轮检索返回；图谱支撑片段按 source_ids 从索引解析，可能不在本轮命中列表。工具链按实际调用、计划依赖和结果引用展示。</p><div class="path-section-heading"><span>KNOWLEDGE RETRIEVAL</span><h3>知识检索路径 <em>${searches.length}</em></h3></div>${retrieval}<div class="path-section-heading tool-heading"><span>TOOL EXECUTION</span><h3>工具执行链 <em>${list(result.calls).length}</em></h3></div>${toolFlow(result)}</div>`;
+  return `<div class="path-view"><p class="path-intro">节点与关系来自本轮检索返回，关联来源集合按 source_ids 从索引解析，可能包含本轮非命中片段。合并描述中的不同句子可能来自不同片段，请展开关联原文逐条核对；来源集合不表示每份原文都支持整段描述。工具链按实际调用、计划依赖和结果引用展示。</p><div class="path-section-heading"><span>KNOWLEDGE RETRIEVAL</span><h3>知识检索路径 <em>${searches.length}</em></h3></div>${retrieval}<div class="path-section-heading tool-heading"><span>TOOL EXECUTION</span><h3>工具执行链 <em>${list(result.calls).length}</em></h3></div>${toolFlow(result)}</div>`;
 }
 function summary(result) {
   const status=result.status;

@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from chem_agent.answers import calculation_answer, calculation_explanation
 from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.trace import RunTrace, utc_now
@@ -207,13 +208,19 @@ class Execution:
             call["latency_ms"] = round((perf_counter() - started) * 1000, 3)
             self.trace.save()
 
-    def complete(self, answer: str, status: str, citations: list[str]) -> str:
+    def complete(
+        self, answer: str, status: str, citations: list[str], explanation: str | None = ""
+    ) -> str:
         if self.trace.data["status"] != "running":
             raise ValueError("任务已经结束，不能改写最终状态或回答。")
         if status not in {"completed", "needs_input", "no_evidence", "failed", "out_of_scope"}:
             raise ValueError("未知任务状态。")
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 16000:
             raise ValueError("回答必须是非空的简短文本。")
+        if explanation is None:
+            explanation = ""
+        if not isinstance(explanation, str) or len(explanation) > 6000:
+            raise ValueError("补充说明需要是最多 6000 字的文本。")
         evidence_ids = {h["chunk_id"] for h in self.trace.data["evidence"]}
         if not isinstance(citations, list) or any(not isinstance(c, str) for c in citations):
             raise ValueError("citations 必须是来源编号列表。")
@@ -229,5 +236,17 @@ class Execution:
                 raise ValueError("计划中的检索没有证据，请重试该检索或使用 no_evidence 状态。")
             if evidence_ids and not citations:
                 raise ValueError("回答需要引用本次检索来源。")
+            verified_answer = calculation_answer(self.trace.data["calls"])
+            if verified_answer is not None:
+                extra = calculation_explanation(
+                    explanation, self.trace.data["calls"], self.trace.data["evidence"], citations
+                )
+                self.trace.data["model_answer"] = answer
+                self.trace.data["answer_source"] = (
+                    "verified_tools_with_explanation" if extra else "verified_tools"
+                )
+                if explanation.strip():
+                    self.trace.data["model_explanation"] = explanation
+                answer = verified_answer + extra
         self.trace.finish(status, answer, citations)
         return answer

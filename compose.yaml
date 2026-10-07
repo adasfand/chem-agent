@@ -1,7 +1,7 @@
 services:
   chem-agent:
     build: .
-    image: chem-agent-demo:0.3.1
+    image: chem-agent-demo:0.3.2
     ports:
       - "127.0.0.1:${CHEM_PORT:-7860}:7860"
     environment:

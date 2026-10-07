@@ -378,16 +378,16 @@ test("path view shows only returned retrieval relations and actual tool referenc
   assert.match(html, /<ul class="entity-description-list"><li>显热说明<\/li><li>补充说明<\/li><li>&lt;img src=x&gt;<\/li><\/ul>/);
   assert.doesNotMatch(html, /<SEP>/);
   assert.doesNotMatch(html, /<img src=x>/);
-  assert.match(html, /实体支撑片段 · 1/);
+  assert.match(html, /实体关联来源集合 · 1/);
   assert.match(html, /显热图谱依据/);
   assert.match(html, /同时命中/);
   assert.match(html, /href="https:\/\/example.org\/heat"/);
-  assert.match(html, /关系支撑片段 · 2/);
+  assert.match(html, /关系关联来源集合 · 2/);
   assert.match(html, /关系图谱依据/);
-  assert.match(html, /图谱支撑 · 非命中/);
+  assert.match(html, /索引关联 · 非命中/);
   assert.match(html, /未解析来源/);
   assert.match(html, /unresolved-id/);
-  assert.match(html, /全部图谱支撑资料 · 2 份/);
+  assert.match(html, /全部索引关联来源 · 2 份/);
   assert.match(html, /1 命中/);
   assert.equal((html.match(/class="path-chunk(?: related)?"/g)||[]).length, 1);
   assert.doesNotMatch(html, /href="javascript:/);
@@ -409,7 +409,45 @@ test("path view shows only returned retrieval relations and actual tool referenc
   assert.equal(prevented, true);
   assert.match(h.element("panel-content").innerHTML, /比热说明/);
   assert.match(h.element("panel-content").innerHTML, /该实体没有明确关联到本轮命中片段/);
-  assert.match(h.element("panel-content").innerHTML, /图谱未返回来源编号/);
+  assert.match(h.element("panel-content").innerHTML, /索引未返回来源编号/);
+  h.element("panel-content").events.click({target:{closest:selector=>selector==="[data-entity-index]"?{dataset:{queryIndex:"0",entityIndex:"0"}}:null}});
+  assert.match(h.element("panel-content").innerHTML, /实体关联来源集合 · 1/);
+  assert.match(h.element("panel-content").innerHTML, /索引关联 · 同时命中/);
+  assert.match(h.element("panel-content").innerHTML, /<div class="graph-source-original"><span>原文<\/span>/);
+});
+
+test("merged graph descriptions label pooled index sources without claiming sentence-level support", () => {
+  const h = harness();
+  const value = job(A, true);
+  value.result.calls = [{
+    step_id:"s1", tool_name:"search_knowledge", status:"succeeded", arguments:{query:"比热"},
+    output:{
+      hits:[{chunk_id:"definition",title:"比热定义",text:"比热定义原文"}],
+      retrieval:{
+        mode:"mix",
+        entities:[{id:"cp",name:"比热",description:"比热定义。<SEP>比热单位。",source_ids:["definition","units"]}],
+        relationships:[{source:"cp",target:"heat",description:"使用比热。<SEP>量纲相容。",source_ids:["definition","units"]}],
+        graph_sources:[
+          {chunk_id:"definition",title:"比热定义",text:"只提供定义的原文",source:"定义资料"},
+          {chunk_id:"units",title:"比热单位",text:"只提供单位的原文",source:"单位资料"},
+        ],
+      },
+    },
+  }];
+  h.show(value);
+  h.run("selectView('path')");
+  const html = h.element("panel-content").innerHTML;
+  assert.match(html, /合并描述中的不同句子可能来自不同片段，请展开关联原文逐条核对/);
+  assert.match(html, /来源集合不表示每份原文都支持整段描述/);
+  assert.match(html, /实体关联来源集合 · 2/);
+  assert.match(html, /关系关联来源集合 · 2/);
+  assert.match(html, /索引关联 · 同时命中/);
+  assert.match(html, /索引关联 · 非命中/);
+  assert.match(html, /片段编号 definition/);
+  assert.match(html, /片段编号 units/);
+  assert.match(html, /只提供定义的原文/);
+  assert.match(html, /只提供单位的原文/);
+  assert.doesNotMatch(html, /图谱支撑|实体支撑|关系支撑/);
 });
 
 test("path view does not invent graph entities for a plain hit and escapes source content", () => {

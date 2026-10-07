@@ -259,7 +259,9 @@ def test_multiple_tool_calls_are_rejected_before_any_action_and_can_be_corrected
         on_progress=lambda value: progress.append(deepcopy(value)),
     )
     assert result["status"] == "completed"
-    assert result["answer"] == "1 MPa = 1000 kPa。"
+    assert "1 MPa → 1000 kPa" in result["answer"]
+    assert result["model_answer"] == "1 MPa = 1000 kPa。"
+    assert result["answer_source"] == "verified_tools"
     assert len(model.received) == 4
     assert len(result["calls"]) == 1
     assert not progress[0]["plan"] and not progress[0]["calls"]
