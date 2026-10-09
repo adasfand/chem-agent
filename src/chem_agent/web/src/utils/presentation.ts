@@ -1,4 +1,5 @@
 import type { RunResult } from '../types/api'
+import { record } from './retrieval'
 export const statusLabels: Record<string, string> = {
   running: '执行中',
   completed: '已完成',
@@ -71,4 +72,59 @@ export function assumptions(result: RunResult): string[] {
         .filter((item): item is string => typeof item === 'string'),
     ),
   ]
+}
+export function calculationInputs(result: RunResult) {
+  return result.calls.flatMap((call) => {
+    if (call.status !== 'succeeded') return []
+    if (!['calc_heat_duty', 'calc_mass_balance', 'convert_units'].includes(call.tool_name))
+      return []
+    const inputs = call.arguments ?? record(call.output?.inputs)
+    const parameters: { label: string; value: number; unit: string; source: string }[] = []
+    const add = (key: string, label: string, value: unknown, unit: string, scale = 1) => {
+      if (typeof value !== 'number' || !Number.isFinite(value * scale)) return
+      const reference = call.input_refs?.find(
+        (item) => item.argument === key && item.value === value,
+      )
+      const supplied = call.input_provenance?.some(
+        (item) => item.argument === key && item.source === 'user' && item.value === value,
+      )
+      parameters.push({
+        label,
+        value: value * scale,
+        unit,
+        source: reference
+          ? `前序结果 ${reference.ref}`
+          : supplied
+            ? '用户提供（后端记录）'
+            : '工具实际入参',
+      })
+    }
+    if (call.tool_name === 'calc_heat_duty') {
+      add('mass_flow_kg_s', '质量流量', inputs.mass_flow_kg_s, 'kg/s')
+      add('specific_heat_kj_kg_k', '质量比热容', inputs.specific_heat_kj_kg_k, 'kJ/(kg·K)')
+      add('delta_t_k', '温差', inputs.delta_t_k, 'K')
+    } else if (call.tool_name === 'calc_mass_balance' && Array.isArray(inputs.streams)) {
+      inputs.streams.forEach((item, index) => {
+        const stream = record(item)
+        add(`streams[${index}].flow_kg_h`, `流股 ${index + 1} · 质量流量`, stream.flow_kg_h, 'kg/h')
+        add(
+          `streams[${index}].mass_fraction`,
+          `流股 ${index + 1} · 质量分数`,
+          stream.mass_fraction,
+          '%',
+          100,
+        )
+      })
+    } else if (call.tool_name === 'convert_units') {
+      add(
+        'value',
+        '换算前数值',
+        inputs.value,
+        typeof inputs.from_unit === 'string' ? inputs.from_unit : '',
+      )
+    }
+    return parameters.length
+      ? [{ id: call.call_id, step: call.step_id, title: toolLabels[call.tool_name]!, parameters }]
+      : []
+  })
 }

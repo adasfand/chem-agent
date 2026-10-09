@@ -1189,9 +1189,20 @@ summary {
 }
 .keyword-groups {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  flex-direction: column;
+  gap: 9px;
   padding: 12px 0;
+}
+.keyword-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.keyword-row small {
+  color: var(--muted);
+  font-size: 10px;
+  flex: 0 0 36px;
 }
 .keyword-groups span {
   padding: 3px 6px;

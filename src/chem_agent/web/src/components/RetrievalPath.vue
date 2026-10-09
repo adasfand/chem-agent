@@ -40,7 +40,11 @@ watch(queryIndex, () => {
 <template>
   <div class="retrieval-path">
     <p v-if="!queries.length" class="empty-message">
-      完成知识检索后，在这里查看本轮查询、实体关系和命中片段。
+      {{
+        result.status === 'running'
+          ? '完成知识检索后，在这里查看本轮查询、实体关系和命中片段。'
+          : '本次任务没有成功的知识检索记录，可在“工具调用”中查看执行过程。'
+      }}
     </p>
     <label v-if="queries.length > 1" class="query-select">
       检索查询
@@ -68,10 +72,17 @@ watch(queryIndex, () => {
         <span>{{ query.hits.length }} 命中</span>
       </div>
       <div v-if="query.keywords.length" class="keyword-groups">
-        <span v-for="word in query.keywords" :key="word">{{ word }}</span>
+        <div v-if="query.highLevel.length" class="keyword-row">
+          <small>主题词</small>
+          <span v-for="word in query.highLevel" :key="word">{{ word }}</span>
+        </div>
+        <div v-if="query.lowLevel.length" class="keyword-row">
+          <small>细节词</small>
+          <span v-for="word in query.lowLevel" :key="word">{{ word }}</span>
+        </div>
       </div>
       <p v-if="query.mode === 'lexical'" class="inline-note">
-        本轮使用词法回退，没有实体关系数据。
+        本轮使用词法检索，没有实体关系数据。
       </p>
       <template v-if="graph.nodes.length">
         <EntityGraph
@@ -86,6 +97,7 @@ watch(queryIndex, () => {
             {{ text(entity.name) || text(entity.id) }}
             <small>{{ entityTypeLabel(text(entity.type) || text(entity.entity_type)) }}</small>
           </h4>
+          <p class="section-help">以下为知识资料中的实体说明，具体工况参数请以本题计算入参为准。</p>
           <p v-for="part in parts(entity.description)" :key="part">{{ part }}</p>
           <small>关联来源集合，需逐条核对原文</small>
           <GraphSources :ids="sourceIds(entity)" :sources="query.sources" :hits="query.hits" />

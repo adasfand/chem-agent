@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { FlaskConical, UserRound, Copy, Check, FileDown, Braces } from '@lucide/vue'
+import { FlaskConical, UserRound, Copy, Check, Wrench, FileDown, Braces } from '@lucide/vue'
 import type { Example, Job } from '../types/api'
 import { resultMetrics, assumptions, numberText } from '../utils/presentation'
 import { exportUrl } from '../services/api'
 import StatusBadge from './StatusBadge.vue'
 import MarkdownText from './MarkdownText.vue'
+import CalculationInputs from './CalculationInputs.vue'
 const props = defineProps<{
   job: Job | null
   loading: boolean
@@ -107,15 +108,17 @@ async function copyAnswer() {
                 <small>{{ metric.unit }}</small>
               </strong>
               <span class="metric-source">
-                <Check :size="12" />
+                <Wrench :size="12" />
                 工具输出 · {{ metric.step }}
               </span>
             </article>
           </div>
+          <CalculationInputs :result="job.result" />
           <MarkdownText v-if="job.result.answer" :text="job.result.answer" />
           <p v-else class="empty-message">最终答复将在任务结束后显示。</p>
           <details v-if="conditions.length" class="assumptions">
-            <summary>计算适用条件 · {{ conditions.length }}</summary>
+            <summary>工具适用前提 · {{ conditions.length }}</summary>
+            <p class="section-help">以下条件来自工具定义，请核对实际工况是否满足。</p>
             <ul>
               <li v-for="condition in conditions" :key="condition">{{ condition }}</li>
             </ul>

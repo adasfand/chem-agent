@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assumptions, resultMetrics } from '../src/utils/presentation'
+import { assumptions, calculationInputs, resultMetrics } from '../src/utils/presentation'
 import { inlineTokens, markdownBlocks } from '../src/utils/markdown'
 import type { RunResult, ToolCall } from '../src/types/api'
 
@@ -97,6 +97,63 @@ describe('observable calculation results', () => {
         ]),
       ),
     ).toEqual(['单相', '恒比热', '无热损失'])
+  })
+  it('displays resolved calculation inputs and only recorded matching provenance', () => {
+    const heat = call('calc_heat_duty', { heat_duty_kw: 46.444 })
+    heat.arguments = { mass_flow_kg_s: 1000 / 3600, specific_heat_kj_kg_k: 4.18, delta_t_k: 40 }
+    heat.input_refs = [
+      { argument: 'mass_flow_kg_s', ref: 's1.value', value: 1000 / 3600, unit: 'kg/s' },
+    ]
+    heat.input_provenance = [{ argument: 'specific_heat_kj_kg_k', source: 'user', value: 4.18 }]
+    const parameters = calculationInputs(result([heat]))[0]!.parameters
+    expect(parameters).toEqual([
+      { label: '质量流量', value: 1000 / 3600, unit: 'kg/s', source: '前序结果 s1.value' },
+      { label: '质量比热容', value: 4.18, unit: 'kJ/(kg·K)', source: '用户提供（后端记录）' },
+      { label: '温差', value: 40, unit: 'K', source: '工具实际入参' },
+    ])
+    heat.input_provenance[0]!.value = 3
+    heat.input_refs[0]!.value = 99
+    expect(calculationInputs(result([heat]))[0]!.parameters.map((item) => item.source)).toEqual([
+      '工具实际入参',
+      '工具实际入参',
+      '工具实际入参',
+    ])
+  })
+  it('retains stream order and zero fractions while displaying mass fractions as percent', () => {
+    const balance = call('calc_mass_balance', { total_flow_kg_h: 500 })
+    balance.arguments = {
+      streams: [
+        { flow_kg_h: 100, mass_fraction: 0.05 },
+        { flow_kg_h: 400, mass_fraction: 0 },
+      ],
+    }
+    const parameters = calculationInputs(result([balance]))[0]!.parameters
+    expect(parameters.map(({ value, unit }) => ({ value, unit }))).toEqual([
+      { value: 100, unit: 'kg/h' },
+      { value: 5, unit: '%' },
+      { value: 400, unit: 'kg/h' },
+      { value: 0, unit: '%' },
+    ])
+  })
+  it('does not promote requested parameters or failed calls to actual inputs', () => {
+    const requested = call('calc_heat_duty', { heat_duty_kw: 999 })
+    requested.requested_arguments = {
+      mass_flow_kg_s: 1,
+      specific_heat_kj_kg_k: 4.18,
+      delta_t_k: 40,
+    }
+    const failed = {
+      ...requested,
+      status: 'failed' as const,
+      arguments: requested.requested_arguments,
+    }
+    expect(calculationInputs(result([requested, failed]))).toEqual([])
+    requested.output = {
+      inputs: { mass_flow_kg_s: 0, specific_heat_kj_kg_k: '4.18', delta_t_k: -40 },
+    }
+    expect(calculationInputs(result([requested]))[0]!.parameters.map((item) => item.value)).toEqual(
+      [0, -40],
+    )
   })
 })
 

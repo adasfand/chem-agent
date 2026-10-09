@@ -7,7 +7,9 @@ defineEmits<{ open: [id: string] }>()
 </script>
 <template>
   <div class="evidence-panel">
-    <p class="section-help">以下为本轮真实检索片段。相关度反映文本匹配程度，不代表答案准确率。</p>
+    <p class="section-help">
+      以下为本轮检索原文。“回答已引用”表示答复引用了该片段，请结合原文核对具体结论。
+    </p>
     <div v-if="!evidence.length" class="empty-message">当前任务尚无检索依据。</div>
     <article v-for="item in evidence" :key="item.chunk_id" class="evidence-card">
       <div class="evidence-heading">

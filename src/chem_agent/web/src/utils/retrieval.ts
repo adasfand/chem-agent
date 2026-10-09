@@ -12,9 +12,14 @@ export const records = (value: unknown): RetrievalRecord[] =>
     : []
 export const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 export const entityTypeLabel = (value: string) =>
-  ({ data: '物理量', concept: '概念', method: '方法', process: '过程', material: '物质' })[
-    value.toLowerCase()
-  ] ||
+  ({
+    data: '物理量',
+    concept: '概念',
+    method: '方法',
+    process: '过程',
+    material: '物质',
+    artifact: '对象',
+  })[value.toLowerCase()] ||
   value ||
   '实体'
 export function parts(value: unknown): string[] {
@@ -35,13 +40,14 @@ export const safeUrl = (value: unknown) =>
   typeof value === 'string' && /^https?:\/\/[^\s<>"']+$/i.test(value) ? value : ''
 export function retrievalFor(call: ToolCall) {
   const data = record(call.output?.retrieval)
+  const highLevel = parts(record(data.keywords).high_level)
+  const lowLevel = parts(record(data.keywords).low_level)
   return {
     query: text(data.query) || text(call.arguments?.query) || text(call.requested_arguments?.query),
     mode: text(data.mode),
-    keywords: [
-      ...parts(record(data.keywords).high_level),
-      ...parts(record(data.keywords).low_level),
-    ],
+    keywords: [...highLevel, ...lowLevel],
+    highLevel,
+    lowLevel,
     entities: records(data.entities),
     relationships: records(data.relationships),
     hits: records(call.output?.hits),
@@ -49,6 +55,66 @@ export function retrievalFor(call: ToolCall) {
     references: records(data.references),
     metadata: record(data.metadata),
   }
+}
+function arrangeRing(count: number, links: [number, number][]) {
+  const adjacent = Array.from({ length: count }, () => new Set<number>())
+  for (const [a, b] of links) {
+    adjacent[a]!.add(b)
+    adjacent[b]!.add(a)
+  }
+  const unseen = new Set(Array.from({ length: count }, (_, index) => index))
+  const order: number[] = []
+  // Keep connected groups together, with depth-first chains occupying neighboring slots.
+  while (unseen.size) {
+    const start = [...unseen].sort((a, b) => adjacent[b]!.size - adjacent[a]!.size || a - b)[0]!
+    const stack = [start]
+    while (stack.length) {
+      const node = stack.pop()!
+      if (!unseen.delete(node)) continue
+      order.push(node)
+      stack.push(
+        ...[...adjacent[node]!]
+          .filter((id) => unseen.has(id))
+          .sort((a, b) => adjacent[a]!.size - adjacent[b]!.size || b - a),
+      )
+    }
+  }
+  const score = (candidate: number[]) => {
+    const position = new Map(candidate.map((id, index) => [id, index]))
+    const intervals = links.map(([a, b]) =>
+      [position.get(a)!, position.get(b)!].sort((a, b) => a - b),
+    )
+    let crossings = 0,
+      span = 0
+    intervals.forEach(([a, b], index) => {
+      span += Math.min(b! - a!, count - (b! - a!))
+      for (const [c, d] of intervals.slice(index + 1)) {
+        if (a === c || a === d || b === c || b === d) continue
+        if ((a! < c! && c! < b! && b! < d!) || (c! < a! && a! < d! && d! < b!)) crossings++
+      }
+    })
+    // Crossing reduction always takes priority over shortening chords.
+    return crossings * (links.length * count + 1) + span
+  }
+  if (count > 32 || links.length > 96) return order
+  let best = score(order)
+  // Bounded refinement prevents a dense response from causing unbounded UI work.
+  for (let pass = 0; pass < 3; pass++) {
+    let improved = false
+    for (let a = 0; a < count; a++)
+      for (let b = a + 1; b < count; b++) {
+        const trial = [...order]
+        ;[trial[a], trial[b]] = [trial[b]!, trial[a]!]
+        const cost = score(trial)
+        if (cost < best) {
+          order.splice(0, count, ...trial)
+          best = cost
+          improved = true
+        }
+      }
+    if (!improved) break
+  }
+  return order
 }
 export function graphLayout(entities: RetrievalRecord[], relationships: RetrievalRecord[]) {
   const nodes = entities.map((item, index) => {
@@ -75,70 +141,30 @@ export function graphLayout(entities: RetrievalRecord[], relationships: Retrieva
       ? [{ from, to, index, description: parts(item.description).join('\n') }]
       : []
   })
-  // Undirected graph distances establish columns; fixed lanes keep labels apart.
-  // Components remain separate and no relationship is inferred from proximity.
-  const adjacent = nodes.map(() => new Set<number>())
-  for (const edge of edges) {
-    adjacent[edge.from.index]!.add(edge.to.index)
-    adjacent[edge.to.index]!.add(edge.from.index)
-  }
-  const unseen = new Set(nodes.map((node) => node.index))
-  let offset = 0
-  const components: { indices: number[]; offset: number; width: number; height: number }[] = []
-  const lane = Math.max(
-    105,
-    ...nodes.map((node) => Math.ceil(Array.from(node.name).length / 11) * 14 + 55),
-  )
-  while (unseen.size) {
-    const root = [...unseen].sort((a, b) => adjacent[b]!.size - adjacent[a]!.size || a - b)[0]!
-    const levels: number[][] = [[root]]
-    unseen.delete(root)
-    for (let depth = 0; depth < levels.length; depth++) {
-      const next: number[] = []
-      for (const index of levels[depth]!) {
-        for (const neighbor of adjacent[index]!) {
-          if (unseen.delete(neighbor)) next.push(neighbor)
-        }
-      }
-      if (next.length) levels.push(next)
-    }
-    const rows = Math.max(...levels.map((level) => level.length))
-    for (const [depth, level] of levels.entries()) {
-      level.forEach((index, row) => {
-        nodes[index]!.x = 110 + depth * 245
-        nodes[index]!.y = offset + lane / 2 + 20 + ((rows - level.length) / 2 + row) * lane
-      })
-    }
-    components.push({
-      indices: levels.flat(),
-      offset,
-      width: 220 + (levels.length - 1) * 245,
-      height: rows * lane + 55,
-    })
-    offset += rows * lane + 55
-  }
-  // Pack disconnected components into two lanes rather than a tall strip.
-  const columns = [
-    { width: 0, height: 0 },
-    { width: 0, height: 0 },
+  // Ring spacing depends on the longest label and node count, so circles cannot overlap.
+  // Placement is visual only: edges above still require actual returned endpoints.
+  const rows = Math.max(1, ...nodes.map((node) => Math.ceil(Array.from(node.name).length / 5)))
+  const nodeRadius = Math.ceil(Math.hypot(45, (rows - 1) * 11) + 12)
+  const orbit =
+    nodes.length < 2
+      ? 0
+      : Math.max(160, (2 * nodeRadius + 32) / (2 * Math.sin(Math.PI / nodes.length)))
+  const width = Math.max(480, 2 * (orbit + nodeRadius + 26))
+  const height = Math.max(360, 2 * (orbit + nodeRadius + 26))
+  const links = [
+    ...new Map(
+      edges.map((edge) => {
+        const pair = [edge.from.index, edge.to.index].sort((a, b) => a - b) as [number, number]
+        return [pair.join(':'), pair] as const
+      }),
+    ).values(),
   ]
-  const placements = components.map((component) => {
-    const column = columns[0]!.height <= columns[1]!.height ? 0 : 1
-    const y = columns[column]!.height
-    columns[column]!.height += component.height
-    columns[column]!.width = Math.max(columns[column]!.width, component.width)
-    return { component, column, y }
+  const order = arrangeRing(nodes.length, links)
+  order.forEach((id, index) => {
+    const node = nodes[id]!
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / nodes.length
+    node.x = width / 2 + orbit * Math.cos(angle)
+    node.y = height / 2 + orbit * Math.sin(angle)
   })
-  for (const { component, column, y } of placements) {
-    for (const index of component.indices) {
-      nodes[index]!.x += column ? columns[0]!.width + 40 : 0
-      nodes[index]!.y += y - component.offset
-    }
-  }
-  return {
-    nodes,
-    edges,
-    width: Math.max(480, columns[0]!.width + columns[1]!.width + (columns[1]!.width ? 40 : 0)),
-    height: Math.max(230, columns[0]!.height, columns[1]!.height),
-  }
+  return { nodes, edges, width, height, nodeRadius, order }
 }

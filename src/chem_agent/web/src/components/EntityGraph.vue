@@ -32,36 +32,48 @@ const neighbors = computed(() => [
     }),
   ).values(),
 ])
-const lines = (name: string) => {
+const lines = (name: string, size = 5, limit = Infinity) => {
   const chars = Array.from(name)
-  return Array.from({ length: Math.ceil(chars.length / 11) }, (_, index) =>
-    chars.slice(index * 11, index * 11 + 11).join(''),
-  )
+  const count = Math.min(Math.ceil(chars.length / size), limit)
+  return Array.from({ length: count }, (_, index) => {
+    const line = chars.slice(index * size, index * size + size).join('')
+    return index === count - 1 && chars.length > size * count
+      ? Array.from(line)
+          .slice(0, size - 1)
+          .join('') + '…'
+      : line
+  })
 }
-const height = (name: string) => Math.max(60, lines(name).length * 14 + 32)
 const focusNodes = computed(() => {
   if (!active.value) return []
-  let y = 28 + height(active.value.name)
-  const nodes = [{ ...active.value, x: 160, y: 28 + height(active.value.name) / 2, width: 284 }]
-  for (let index = 0; index < neighbors.value.length; index += 2) {
-    const row = neighbors.value.slice(index, index + 2)
-    const rowHeight = Math.max(...row.map((node) => height(node.name)))
-    y += 38
-    row.forEach((node, column) =>
-      nodes.push({
-        ...node,
-        x: row.length === 1 ? 160 : 81 + column * 158,
-        y: y + rowHeight / 2,
-        width: 140,
-      }),
-    )
-    y += rowHeight
-  }
-  return nodes
+  const candidates = [active.value, ...neighbors.value, ...graph.value.nodes]
+  const included = new Set(
+    [...new Map(candidates.map((node) => [node.index, node])).keys()].slice(0, 9),
+  )
+  const order = graph.value.order.filter((id) => included.has(id))
+  const start = order.indexOf(active.value.index)
+  const nodes = [...order.slice(start), ...order.slice(0, start)].map(
+    (id) => graph.value.nodes[id]!,
+  )
+  return nodes.map((node, index) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / nodes.length
+    const orbit = nodes.length === 1 ? 0 : 110
+    return {
+      ...node,
+      x: 160 + orbit * Math.cos(angle),
+      y: 160 + orbit * Math.sin(angle),
+      radius: node.index === active.value?.index ? 36 : 32,
+    }
+  })
 })
-const focusHeight = computed(() =>
-  Math.max(150, ...focusNodes.value.map((node) => node.y + height(node.name) / 2 + 24)),
-)
+const focusEdges = computed(() => {
+  const nodes = new Map(focusNodes.value.map((node) => [node.index, node]))
+  return visibleEdges.value.flatMap((edge) => {
+    const from = nodes.get(edge.from.index),
+      to = nodes.get(edge.to.index)
+    return from && to ? [{ ...edge, from, to }] : []
+  })
+})
 const visibleEdges = computed(() => [
   ...new Map(
     graph.value.edges.map(
@@ -69,15 +81,12 @@ const visibleEdges = computed(() => [
     ),
   ).values(),
 ])
-const path = (edge: (typeof graph.value.edges)[number]) => {
+const path = (edge: (typeof graph.value.edges)[number], radius = graph.value.nodeRadius) => {
   const { from, to } = edge
-  if (from.x === to.x) {
-    return `M ${from.x + 90} ${from.y} C ${from.x + 145} ${from.y}, ${to.x + 145} ${to.y}, ${to.x + 90} ${to.y}`
-  }
-  const direction = to.x > from.x ? 1 : -1
-  const x1 = from.x + direction * 90,
-    x2 = to.x - direction * 90
-  return `M ${x1} ${from.y} C ${(x1 + x2) / 2} ${from.y}, ${(x1 + x2) / 2} ${to.y}, ${x2} ${to.y}`
+  const dx = to.x - from.x,
+    dy = to.y - from.y
+  const distance = Math.hypot(dx, dy) || 1
+  return `M ${from.x + (dx * radius) / distance} ${from.y + (dy * radius) / distance} L ${to.x - (dx * radius) / distance} ${to.y - (dy * radius) / distance}`
 }
 const dialog = ref<HTMLDialogElement>()
 const canvas = ref<HTMLDivElement>()
@@ -154,11 +163,12 @@ watch(
       </select>
     </label>
     <div class="graph-focus">
-      <svg :viewBox="`0 0 320 ${focusHeight}`" role="group" aria-label="选中实体与直接关联实体">
+      <svg viewBox="0 0 320 320" role="group" aria-label="本轮实体关系预览">
         <path
-          v-for="node in focusNodes.slice(1)"
-          :key="`link-${node.index}`"
-          :d="`M 160 ${focusNodes[0]!.y + height(focusNodes[0]!.name) / 2} C 160 ${node.y - height(node.name) / 2 - 18}, ${node.x} ${node.y - height(node.name) / 2 - 18}, ${node.x} ${node.y - height(node.name) / 2}`"
+          v-for="edge in focusEdges"
+          :key="`link-${edge.index}`"
+          :d="path(edge, 34)"
+          :class="{ active: edge.from.index === selected || edge.to.index === selected }"
         />
         <g
           v-for="node in focusNodes"
@@ -172,24 +182,15 @@ watch(
           @keydown.enter.prevent="selected = node.index"
           @keydown.space.prevent="selected = node.index"
         >
-          <rect
-            :x="node.x - node.width / 2"
-            :y="node.y - height(node.name) / 2"
-            :width="node.width"
-            :height="height(node.name)"
-            rx="8"
-          />
+          <circle :cx="node.x" :cy="node.y" :r="node.radius" />
           <text
-            class="graph-node-type"
             :x="node.x"
-            :y="node.y - height(node.name) / 2 + 17"
+            :y="node.y - (lines(node.name, 5, 3).length - 1) * 7"
             text-anchor="middle"
+            dominant-baseline="middle"
           >
-            {{ typeLabel(node.type) }}
-          </text>
-          <text :x="node.x" :y="node.y - height(node.name) / 2 + 35" text-anchor="middle">
             <tspan
-              v-for="(line, index) in lines(node.name)"
+              v-for="(line, index) in lines(node.name, 5, 3)"
               :key="index"
               :x="node.x"
               :dy="index ? 14 : 0"
@@ -203,7 +204,8 @@ watch(
       <p v-if="!neighbors.length" class="graph-empty">本轮未返回该实体的关联关系。</p>
     </div>
     <p class="graph-caption">
-      显示选中实体的 {{ neighbors.length }} 个直接关联实体。点击节点切换；连线不表示因果方向。
+      预览 {{ focusNodes.length }} /
+      {{ graph.nodes.length }} 个本轮实体。点击圆形节点查看详情；仅连接返回数据中端点匹配的关系。
     </p>
     <p v-if="relationships.length > graph.edges.length" class="graph-caption">
       另有
@@ -318,27 +320,18 @@ watch(
                 @keydown.enter.prevent="selected = node.index"
                 @keydown.space.prevent="selected = node.index"
               >
-                <rect
-                  :x="node.x - 90"
-                  :y="node.y - height(node.name) / 2"
-                  width="180"
-                  :height="height(node.name)"
-                  rx="8"
-                />
+                <circle :cx="node.x" :cy="node.y" :r="graph.nodeRadius" />
                 <text
-                  class="graph-node-type"
                   :x="node.x"
-                  :y="node.y - height(node.name) / 2 + 17"
+                  :y="node.y - (lines(node.name).length - 1) * 11"
                   text-anchor="middle"
+                  dominant-baseline="middle"
                 >
-                  {{ typeLabel(node.type) }}
-                </text>
-                <text :x="node.x" :y="node.y - height(node.name) / 2 + 35" text-anchor="middle">
                   <tspan
                     v-for="(line, index) in lines(node.name)"
                     :key="index"
                     :x="node.x"
-                    :dy="index ? 14 : 0"
+                    :dy="index ? 22 : 0"
                   >
                     {{ line }}
                   </tspan>
@@ -357,7 +350,7 @@ watch(
               <i class="neighbor" aria-hidden="true" />
               与它直接关联的实体
             </span>
-            <p>点击图中的实体卡片切换查看。颜色标记仅用于说明。</p>
+            <p>点击图中的圆形节点切换查看。颜色标记仅用于说明。</p>
             <p>同一对实体的多条关系合并为一条线，详情逐条展示。</p>
           </div>
         </section>
@@ -463,27 +456,31 @@ svg path {
   stroke: #b7c9e2;
   stroke-width: 1.5;
 }
-svg rect {
+svg circle {
   fill: #fff;
-  stroke: #d5dde9;
-  stroke-width: 1;
+  stroke: #a9bed8;
+  stroke-width: 1.7;
 }
 svg text {
   fill: #344054;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
   pointer-events: none;
 }
-svg .graph-node-type {
-  fill: #8994a6;
-  font-size: 9px;
+svg path.active {
+  stroke: #7da0d1;
+  stroke-width: 2;
+}
+.graph-focus text {
+  font-size: 11px;
 }
 svg g {
   cursor: pointer;
 }
-svg g.active rect {
+svg g.active circle {
   fill: #eff6ff;
   stroke: #2563eb;
-  stroke-width: 1.5;
+  stroke-width: 2.5;
 }
 svg g.active text {
   fill: #1d4ed8;
@@ -491,7 +488,7 @@ svg g.active text {
 svg g:focus {
   outline: none;
 }
-svg g:focus-visible rect {
+svg g:focus-visible circle {
   stroke: #1d4ed8;
   stroke-width: 3;
 }
@@ -583,12 +580,13 @@ svg g:focus-visible rect {
   overflow: auto;
   flex: 1;
   min-height: 220px;
-  background-image: radial-gradient(#d6dfe9 0.7px, transparent 0.7px);
-  background-size: 18px 18px;
 }
 .graph-full {
   display: block;
   margin: 18px auto;
+}
+.graph-full text {
+  font-size: 18px;
 }
 .graph-full path {
   stroke: #d0d8e4;
@@ -598,11 +596,11 @@ svg g:focus-visible rect {
   stroke: #4d83d9;
   stroke-width: 2;
 }
-.graph-full g.neighbor rect {
+.graph-full g.neighbor circle {
   stroke: #93b4e7;
   fill: #fbfdff;
 }
-.graph-full g.active rect {
+.graph-full g.active circle {
   fill: #eff6ff;
   stroke: #2563eb;
 }
