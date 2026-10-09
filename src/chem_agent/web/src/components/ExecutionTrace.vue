@@ -59,6 +59,10 @@ const json = (value: unknown) => JSON.stringify(value ?? {}, null, 2)
           <summary>模型请求的原始参数</summary>
           <pre>{{ json(call.requested_arguments) }}</pre>
         </details>
+        <details v-if="call.input_provenance?.length">
+          <summary>用户给定参数的来源记录</summary>
+          <pre>{{ json(call.input_provenance) }}</pre>
+        </details>
         <h4>{{ call.error ? '错误信息' : '工具返回值' }}</h4>
         <pre :class="{ 'error-output': call.error }">{{ json(call.error ?? call.output) }}</pre>
       </div>

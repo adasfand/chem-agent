@@ -27,6 +27,29 @@ uv run python scripts/demo_offline.py --flow 2000
 
 ## 安装与启动
 
+### 本机前后端分别启动（Conda + Vue）
+
+在已安装依赖的本机，打开两个终端，分别执行：
+
+```bat
+cd /d "E:\Python PyCharm\chem-agent"
+conda activate chem-agent
+python app.py
+```
+
+```bat
+cd /d "E:\Python PyCharm\chem-agent\src\chem_agent\web"
+npm run dev
+```
+
+日常使用 Vue 问答工作台 `http://127.0.0.1:5173/`。它通过 `/api` 代理访问 `7860`，采用独立入口 `web/client/index.html`，组件、状态管理、API 请求和类型分别位于 `web/src/`。`7860` 的原生演示页面保留，两个页面各自启动，Vue 页面不加载后端 HTML。后端端口改变时需同步修改 `web/vite.config.ts` 中的代理目标。
+
+前端沿用 Vue 3、TypeScript、Vite 和本地图标资源，视觉参照 shadcn 工作台布局；未引入 React。无 CDN、远程字体或外部 UI 资源依赖。迁移后在 `web` 执行 `npm ci` 安装锁定依赖，或恢复同平台离线依赖包中的 `node_modules`。`npm run build` 输出 `web/dist`，`npm run preview` 可在 `4173` 检查生产构建，同时仍需启动后端。前端离线资源可用不表示模型推理可离线运行。
+
+源码提交包含 `client`、`src`、前端测试及 package/lock/config 文件；`node_modules`、构建产物、缓存和密钥不提交。下文保留后端的 uv 安装、索引构建及原生演示操作方式。
+
+### 后端依赖与模型配置
+
 需要 Python 3.11–3.13、`uv`；本机使用 Python 3.12。未安装 uv 时可运行 `python -m pip install uv`。首次安装依赖和调用模型需要联网。解压后在含 `pyproject.toml` 的目录执行：
 
 ```bash
@@ -57,7 +80,7 @@ uv run chem-agent ui
 
 `rag-index` 首次运行会下载约 90 MB 的本地中文向量模型，并用 DeepSeek 以中文从当前资料抽取实体关系；需要网络、有效密钥并消耗 API 额度。索引持久保存于忽略目录 `build/lightrag/`，源码交付包不包含它。资料有变化后重新执行该命令；`uv run chem-agent rag-status` 可离线检查是否就绪。未建索引时仍可运行旧的词法检索，工作台会标明当前后端。普通 LightRAG 查询也可能调用 DeepSeek 做关键词抽取，其请求不计入主代理的 `model_requests` 数量。
 
-按上述配置打开 `http://127.0.0.1:7865`；程序默认端口为 `7860`。端口冲突时修改 `CHEM_PORT`。也可用 `./start.sh`（macOS/Linux）或 `start.bat`（Windows）。前端为原生 HTML/CSS/JavaScript，由 FastAPI/uvicorn 提供页面和接口，无需 Node 或前端构建。启动时保持一个服务进程。
+按上述配置打开 `http://127.0.0.1:7865`；程序默认端口为 `7860`。端口冲突时修改 `CHEM_PORT`。也可用 `./start.sh`（macOS/Linux）或 `start.bat`（Windows）。此地址上的原生演示页面由 FastAPI/uvicorn 提供，无需 Node；独立 Vue 工作台按上节启动。后端保持一个服务进程。
 
 ## 工作台操作
 

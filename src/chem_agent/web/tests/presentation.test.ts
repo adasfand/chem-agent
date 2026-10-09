@@ -101,11 +101,21 @@ describe('observable calculation results', () => {
 })
 
 describe('safe readable knowledge text', () => {
+  it('preserves heading hierarchy and promotes known answer section labels only', () => {
+    expect(markdownBlocks('# 显热\n## 公式\n\n计算输入与方法：\n- 核对单位\n\n来源：')).toEqual([
+      { kind: 'heading', text: '显热', level: 1 },
+      { kind: 'heading', text: '公式', level: 2 },
+      { kind: 'heading', text: '计算输入与方法', level: 1 },
+      { kind: 'list', text: '', items: ['核对单位'], ordered: false },
+      { kind: 'paragraph', text: '来源：' },
+    ])
+  })
+
   it('parses real newlines, headings, lists, quotations and code fences', () => {
     const text =
       '# 显热计算\n\n公式说明\n第二行\n\n- 单相\n- 恒比热\n\n> 来源：自编\n\n```text\nQ = m * cp * dT\n```'
     expect(markdownBlocks(text)).toEqual([
-      { kind: 'heading', text: '显热计算' },
+      { kind: 'heading', text: '显热计算', level: 1 },
       { kind: 'paragraph', text: '公式说明\n第二行' },
       { kind: 'list', text: '', items: ['单相', '恒比热'], ordered: false },
       { kind: 'quote', text: '来源：自编' },

@@ -38,6 +38,10 @@ EXCLUDED_PARTS = {
     "runs",
     "build",
     "dist",
+    "node_modules",
+    ".vite",
+    "coverage",
+    ".idea",
 }
 
 

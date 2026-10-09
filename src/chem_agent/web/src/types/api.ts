@@ -27,6 +27,7 @@ export interface ToolCall {
   }[]
   output?: Record<string, JsonValue>
   error?: JsonValue
+  input_provenance?: Record<string, JsonValue>[]
 }
 export interface KnowledgeItem {
   doc_id: string
@@ -43,7 +44,7 @@ export interface Evidence {
   title: string
   text: string
   source: string
-  score: number
+  score?: number
 }
 export interface RunResult {
   run_id?: string
@@ -58,9 +59,11 @@ export interface RunResult {
   evidence: Evidence[]
   citations: string[]
   record_warning?: string
+  answer_source?: string
 }
 export interface Job {
   job_id: string
+  client_request_id?: string | null
   finished: boolean
   cancel_requested: boolean
   result: RunResult
@@ -71,6 +74,7 @@ export interface RunSummary {
   status: RunStatus
   created_at: string
   run_id?: string
+  client_request_id?: string | null
 }
 export interface Session {
   id: string
@@ -88,12 +92,19 @@ export interface Bootstrap {
   examples: Example[]
   knowledge: KnowledgeItem[]
   session: Session
+  index_status?: {
+    state: string
+    backend: string
+    message: string
+    document_count: number
+    chunk_count: number
+  }
 }
 export interface WorkbenchApi {
   bootstrap(): Promise<Bootstrap>
   session(): Promise<Session>
   job(id: string): Promise<Job>
-  submit(question: string, parentId: string | null): Promise<Job>
+  submit(question: string, parentId: string | null, requestId?: string): Promise<Job>
   cancel(id: string): Promise<Job>
   knowledge(id: string): Promise<KnowledgeDetail>
 }

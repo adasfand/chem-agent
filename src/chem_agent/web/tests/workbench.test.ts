@@ -42,6 +42,7 @@ function session(...jobs: Job[]): Session {
       status: item.result.status,
       created_at: item.result.started_at,
       run_id: item.result.run_id,
+      client_request_id: item.client_request_id,
     })),
   }
 }
@@ -133,7 +134,11 @@ describe('workbench task lifecycle', () => {
     workbench.state.draft = '  比热为4.18 kJ/(kg·K)。  '
     const submitting = workbench.submit()
     await workbench.submit()
-    expect(api.submit).toHaveBeenCalledExactlyOnceWith('比热为4.18 kJ/(kg·K)。', 'parent')
+    expect(api.submit).toHaveBeenCalledExactlyOnceWith(
+      '比热为4.18 kJ/(kg·K)。',
+      'parent',
+      expect.stringMatching(/^[a-f0-9]{32}$/),
+    )
     pending.resolve(job('child'))
     await submitting
     expect(workbench.state.job?.job_id).toBe('child')
@@ -158,8 +163,11 @@ describe('workbench task lifecycle', () => {
   it('recovers a finished task after its POST response is lost without resubmitting', async () => {
     const api = mockApi()
     const received = job('received', true, '查询定压比热')
-    api.submit.mockRejectedValue(new ApiError('网络中断'))
-    api.session.mockResolvedValue(session(received))
+    api.submit.mockImplementation(async (_question, _parent, requestId) => {
+      received.client_request_id = requestId
+      throw new ApiError('网络中断')
+    })
+    api.session.mockImplementation(async () => session(received))
     api.job.mockResolvedValue(received)
     const workbench = controller(api)
     await workbench.boot()
@@ -186,6 +194,7 @@ describe('workbench task lifecycle', () => {
     expect(workbench.state.draft).toBe('查询定压比热')
     expect(api.submit).toHaveBeenCalledTimes(1)
     const received = job('received', false, '查询定压比热')
+    received.client_request_id = api.submit.mock.calls[0]?.[2]
     api.bootstrap.mockResolvedValue(bootstrap(session(received)))
     api.session.mockResolvedValue(session(received))
     api.job.mockResolvedValue(received)
@@ -399,5 +408,72 @@ describe('workbench task lifecycle', () => {
     await loading
     expect(workbench.state.bootstrap).toBeNull()
     expect(workbench.state.connected).toBe(false)
+  })
+})
+
+// A second tab's task must never be mistaken for this POST's result.
+describe('idempotent submission recovery', () => {
+  it('retries the identical request ID when the session snapshot precedes acceptance', async () => {
+    const api = mockApi()
+    const accepted = job('accepted')
+    api.submit.mockRejectedValueOnce(new ApiError('响应丢失')).mockResolvedValueOnce(accepted)
+    api.session.mockResolvedValue(session(job('other-tab')))
+    const workbench = controller(api)
+    await workbench.boot()
+    workbench.state.draft = '计算本轮任务'
+    await workbench.submit()
+    expect(api.submit).toHaveBeenCalledTimes(2)
+    expect(api.submit.mock.calls[1]).toEqual(api.submit.mock.calls[0])
+    expect(workbench.state.job?.job_id).toBe('accepted')
+    expect(api.job).not.toHaveBeenCalledWith('other-tab')
+  })
+  it('recovers the matching finished request even when a different tab is active', async () => {
+    const api = mockApi()
+    const accepted = job('accepted', true)
+    api.submit.mockImplementation(async (_question, _parent, id) => {
+      accepted.client_request_id = id
+      throw new ApiError('响应丢失')
+    })
+    api.session.mockImplementation(async () => session(job('other-tab'), accepted))
+    api.job.mockResolvedValue(accepted)
+    const workbench = controller(api)
+    await workbench.boot()
+    workbench.state.draft = accepted.result.question
+    await workbench.submit()
+    expect(api.job).toHaveBeenCalledExactlyOnceWith('accepted')
+    expect(api.submit).toHaveBeenCalledTimes(1)
+  })
+  it('keeps the draft editable after an explicit busy rejection', async () => {
+    const api = mockApi()
+    api.submit.mockRejectedValue(new ApiError('服务忙', 409))
+    const workbench = controller(api)
+    await workbench.boot()
+    workbench.state.draft = '待运行的问题'
+    await workbench.submit()
+    expect(workbench.state.draft).toBe('待运行的问题')
+    expect(workbench.busy.value).toBe(false)
+    expect(api.submit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('recovery rejection', () => {
+  it('releases an uncertain follow-up when its parent expired during a restart', async () => {
+    const api = mockApi()
+    const parent = job('expired-parent', true)
+    api.bootstrap.mockResolvedValue(bootstrap(session(parent)))
+    api.job.mockResolvedValue(parent)
+    api.session.mockResolvedValue(session())
+    api.submit
+      .mockRejectedValueOnce(new ApiError('连接中断'))
+      .mockRejectedValueOnce(new ApiError('父任务已过期', 404))
+    const workbench = controller(api)
+    await workbench.boot()
+    workbench.state.draft = '比热为4.18 kJ/(kg·K)'
+    await workbench.submit()
+    expect(workbench.state.uncertainSubmission).toBe(false)
+    expect(workbench.state.job).toBeNull()
+    expect(workbench.state.draft).toBe('比热为4.18 kJ/(kg·K)')
+    expect(workbench.busy.value).toBe(false)
+    expect(workbench.state.notice?.message).toBe('父任务已过期')
   })
 })

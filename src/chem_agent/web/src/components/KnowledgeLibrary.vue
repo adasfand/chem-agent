@@ -78,6 +78,7 @@ onUnmounted(() => {
           v-for="item in filtered"
           :key="item.doc_id"
           :class="{ selected: selected === item.doc_id }"
+          :aria-current="selected === item.doc_id ? 'true' : undefined"
           @click="select(item.doc_id)"
         >
           <FileText :size="17" />
@@ -89,7 +90,7 @@ onUnmounted(() => {
         </button>
         <p v-if="!filtered.length" class="empty-message">没有匹配的知识卡，请调整关键词。</p>
       </div>
-      <p class="library-note">项目自编教学资料，非实测物性数据库。</p>
+      <p class="library-note">含教学卡及官方来源整理卡，不代替实测物性数据。</p>
     </section>
     <section class="knowledge-document panel" :aria-busy="loading">
       <div v-if="loading" class="empty-message">正在读取知识卡…</div>
@@ -101,11 +102,7 @@ onUnmounted(() => {
         <div class="document-heading">
           <span class="document-label">知识卡</span>
           <h2>{{ detail.title }}</h2>
-          <p>
-            {{ detail.chunk_count }} 个知识片段
-            <span>·</span>
-            {{ detail.doc_id }}
-          </p>
+          <p>{{ detail.chunk_count }} 个知识片段</p>
         </div>
         <div class="source-banner">
           <BookOpen :size="17" />

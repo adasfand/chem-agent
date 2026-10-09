@@ -13,8 +13,8 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write src tests vite.config.ts eslint.config.js tsconfig.json package.json index.html",
-    "format:check": "prettier --check src tests vite.config.ts eslint.config.js tsconfig.json package.json index.html"
+    "format": "prettier --write src tests client vite.config.ts eslint.config.js tsconfig.json package.json",
+    "format:check": "prettier --check src tests client vite.config.ts eslint.config.js tsconfig.json package.json"
   },
   "dependencies": {
     "@lucide/vue": "1.50.0",

@@ -25,3 +25,6 @@
 **/.venv/**
 **/build/**
 **/dist/**
+**/node_modules/**
+**/.vite/**
+**/coverage/**

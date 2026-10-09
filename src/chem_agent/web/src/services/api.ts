@@ -65,10 +65,11 @@ export const api: WorkbenchApi = {
   },
   session: () => request<Session>('/api/session'),
   job: (id) => request<Job>(`/api/jobs/${encodeURIComponent(id)}`),
-  submit: (question, parentId) =>
+  submit: (question, parentId, requestId) =>
     request<Job>('/api/jobs', {
       method: 'POST',
-      body: JSON.stringify({ question, parent_job_id: parentId }),
+      headers: requestId ? { 'X-Request-ID': requestId } : {},
+      body: JSON.stringify({ question, parent_job_id: parentId, client_request_id: requestId }),
     }),
   cancel: (id) => request<Job>(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   knowledge: knowledgeCache.load,

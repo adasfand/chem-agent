@@ -9,7 +9,13 @@ const blocks = computed(() => markdownBlocks(props.text))
 <template>
   <div class="markdown-text">
     <template v-for="(block, index) in blocks" :key="index">
-      <h3 v-if="block.kind === 'heading'"><InlineText :text="block.text" /></h3>
+      <component
+        :is="`h${Math.min(6, (block.level || 1) + 2)}`"
+        v-if="block.kind === 'heading'"
+        class="markdown-heading"
+      >
+        <InlineText :text="block.text" />
+      </component>
       <pre v-else-if="block.kind === 'code'"><code>{{ block.text }}</code></pre>
       <blockquote v-else-if="block.kind === 'quote'"><InlineText :text="block.text" /></blockquote>
       <component :is="block.ordered ? 'ol' : 'ul'" v-else-if="block.kind === 'list'">

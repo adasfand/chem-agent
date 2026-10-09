@@ -35,7 +35,11 @@ export function createWorkbench(
   let timer: ReturnType<typeof setTimeout> | undefined
   let pendingPoll: { id: string; version: number } | null = null
   let failures = 0
-  let pendingSubmission: { question: string; previousIds: Set<string> } | null = null
+  let pendingSubmission: {
+    question: string
+    requestId: string
+    parent: string | null
+  } | null = null
 
   const running = computed(() => Boolean(state.job && !state.job.finished))
   const busy = computed(() => running.value || state.submitting || state.uncertainSubmission)
@@ -173,29 +177,46 @@ export function createWorkbench(
   }
 
   function recoveredId(session: Session) {
-    if (session.active_job_id) return session.active_job_id
-    // Also recover a task that finished while its POST response was lost.
-    return session.runs.find(
-      (run) =>
-        pendingSubmission &&
-        !pendingSubmission.previousIds.has(run.job_id) &&
-        run.question === pendingSubmission.question,
-    )?.job_id
+    const pending = pendingSubmission
+    if (!pending) return undefined
+    return session.runs.find((run) => run.client_request_id === pending.requestId)?.job_id
   }
 
   async function recoverSubmission(version: number) {
-    const session = await refreshSession()
-    const id = recoveredId(session)
-    if (!current(version)) return
-    if (id) {
-      const job = await api.job(id)
+    try {
+      const session = await refreshSession()
+      const id = recoveredId(session)
       if (!current(version)) return
-      adopt(job)
-      notify('已恢复服务器接收的任务。')
+      if (id) {
+        const job = await api.job(id)
+        if (!current(version)) return
+        adopt(job)
+        notify('已恢复服务器接收的任务。')
+      } else if (pendingSubmission) {
+        // Retry the identical request ID. The backend returns the existing job if
+        // the first POST arrived after the session snapshot, avoiding duplicate work.
+        const pending = pendingSubmission
+        const job = await api.submit(pending.question, pending.parent, pending.requestId)
+        if (!current(version)) return
+        adopt(job)
+        notify('已确认任务提交状态。')
+        await refreshSession().catch(() => {})
+      }
+      pendingSubmission = null
+      state.uncertainSubmission = false
+      state.connected = true
+    } catch (error) {
+      if (!current(version)) return
+      if (error instanceof ApiError && error.status && error.status >= 400 && error.status < 500) {
+        pendingSubmission = null
+        state.uncertainSubmission = false
+        state.connected = true
+        if (error.status === 404) state.job = null
+        notify(message(error), 'error')
+        return
+      }
+      throw error
     }
-    pendingSubmission = null
-    state.uncertainSubmission = false
-    state.connected = true
   }
 
   async function submit() {
@@ -206,9 +227,14 @@ export function createWorkbench(
     stopPoll()
     state.submitting = true
     state.notice = null
-    pendingSubmission = { question, previousIds: new Set(state.runs.map((run) => run.job_id)) }
+    const requestId = crypto.randomUUID().replaceAll('-', '')
+    pendingSubmission = {
+      question,
+      parent,
+      requestId,
+    }
     try {
-      const job = await api.submit(question, parent)
+      const job = await api.submit(question, parent, requestId)
       if (!current(version)) return
       pendingSubmission = null
       adopt(job)
@@ -216,9 +242,9 @@ export function createWorkbench(
     } catch (error) {
       if (!current(version)) return
       notify(message(error), 'error')
-      // Only ambiguous transport/server errors require reconciliation; never blindly retry POST.
+      // Only uncertain transport/server outcomes require idempotent reconciliation.
       const ambiguous = !(error instanceof ApiError) || !error.status || error.status >= 500
-      if (ambiguous || (error instanceof ApiError && error.status === 409)) {
+      if (ambiguous) {
         state.uncertainSubmission = true
         try {
           await recoverSubmission(version)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, ArrowUpRight } from '@lucide/vue'
+import { BookOpen, ArrowRight } from '@lucide/vue'
 import type { Evidence } from '../types/api'
 import MarkdownText from './MarkdownText.vue'
 defineProps<{ evidence: Evidence[]; citations: string[] }>()
@@ -17,15 +17,21 @@ defineEmits<{ open: [id: string] }>()
           {{ citations.includes(item.chunk_id) ? '回答已引用' : '仅检索' }}
         </span>
       </div>
-      <div class="evidence-meta">
-        <code>{{ item.chunk_id }}</code>
-        <span>相关度 {{ item.score.toFixed(3) }}</span>
+      <div
+        v-if="typeof item.score === 'number' && Number.isFinite(item.score)"
+        class="evidence-meta"
+      >
+        <span>文本匹配分数 {{ item.score.toFixed(3) }}</span>
       </div>
       <MarkdownText :text="item.text" />
       <p class="source-line">来源：{{ item.source }}</p>
-      <button class="text-button" @click="$emit('open', item.doc_id)">
+      <button
+        class="text-button"
+        title="在知识资料库中查看此知识卡的全文"
+        @click="$emit('open', item.doc_id)"
+      >
         查看完整知识卡
-        <ArrowUpRight :size="14" />
+        <ArrowRight :size="14" />
       </button>
     </article>
   </div>

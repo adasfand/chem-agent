@@ -1,22 +1,23 @@
 :root {
-  font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
   font-size: 14px;
-  color: #172c48;
-  background: #edf2f7;
+  color: #182230;
+  background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #172c48;
-  --muted: #52637a;
-  --accent: #245bcc;
-  --accent-dark: #19469f;
-  --border: #d7dfe9;
-  --soft: #f4f7fb;
-  --sidebar: #122b4a;
+  --ink: #182230;
+  --muted: #667085;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --border: #e4e7ec;
+  --soft: #f8fafc;
   --radius: 8px;
 }
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 body {
   margin: 0;
@@ -33,21 +34,11 @@ a {
 }
 button {
   cursor: pointer;
+  color: inherit;
 }
 button:disabled {
   cursor: not-allowed;
-}
-button,
-input,
-textarea {
-  outline: none;
-}
-:focus-visible {
-  outline: 3px solid #397bdf;
-  outline-offset: 3px;
-}
-button {
-  color: inherit;
+  opacity: 0.5;
 }
 a {
   color: inherit;
@@ -68,7 +59,7 @@ pre {
   font-family: 'Cascadia Code', Consolas, monospace;
 }
 code {
-  font-size: 0.88em;
+  font-size: 0.85em;
   overflow-wrap: anywhere;
 }
 pre {
@@ -86,12 +77,12 @@ textarea {
     border-color 0.15s,
     color 0.15s;
 }
-::selection {
-  background: #d0e2ff;
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #c6d2d8 transparent;
+::selection {
+  background: #dbeafe;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -7,6 +7,7 @@ export interface MarkdownBlock {
   text: string
   items?: string[]
   ordered?: boolean
+  level?: number
 }
 /** A deliberately small Markdown subset; all content is rendered as Vue text nodes. */
 export function inlineTokens(text: string): InlineToken[] {
@@ -56,11 +57,17 @@ export function markdownBlocks(text: string): MarkdownBlock[] {
       flush()
       continue
     }
-    const heading = line.match(/^#{1,6}\s+(.+)/)
+    const heading = line.match(/^(#{1,6})\s+(.+)/)
+    const section = line
+      .trim()
+      .match(/^(计算结果|计算输入与方法|适用条件|计算方法|计算步骤|结论|注意事项)[：:]$/)
     const item = line.match(/^\s*(?:([-*])|\d+[.)、])\s+(.+)/)
     if (heading) {
       flush()
-      blocks.push({ kind: 'heading', text: heading[1] ?? '' })
+      blocks.push({ kind: 'heading', text: heading[2] ?? '', level: heading[1]?.length || 1 })
+    } else if (section) {
+      flush()
+      blocks.push({ kind: 'heading', text: section[1] ?? '', level: 1 })
     } else if (item) {
       const ordered = !item[1]
       if (!list || list.ordered !== ordered) {

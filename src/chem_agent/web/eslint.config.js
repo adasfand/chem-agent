@@ -3,7 +3,7 @@ import ts from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 
 export default ts.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'app.js'] },
   js.configs.recommended,
   ...ts.configs.recommended,
   ...vue.configs['flat/essential'],
