@@ -22,9 +22,18 @@ def knowledge() -> KnowledgeBase:
 
 def test_inventory_has_attributed_original_cards(knowledge: KnowledgeBase) -> None:
     inventory = knowledge.inventory()
-    assert len(inventory) == 15
-    assert len({item["doc_id"] for item in inventory}) == 15
-    assert all("项目自编教学说明，非实测物性数据" in item["source"] for item in inventory)
+    assert len(inventory) >= 21
+    assert len({item["doc_id"] for item in inventory}) == len(inventory)
+    original = [
+        item
+        for item in inventory
+        if item["doc_id"].split("_")[0].isdigit() and int(item["doc_id"].split("_")[0]) <= 15
+    ]
+    sourced = [item for item in inventory if item not in original]
+    assert len(original) == 15
+    assert all("项目自编教学说明，非实测物性数据" in item["source"] for item in original)
+    assert len(sourced) >= 6
+    assert all("https://" in item["source"] for item in sourced)
     assert all(item["chunk_count"] >= 1 for item in inventory)
     inventory[0]["title"] = "changed outside"
     assert knowledge.inventory()[0]["title"] != "changed outside"
@@ -34,15 +43,15 @@ def test_inventory_has_attributed_original_cards(knowledge: KnowledgeBase) -> No
     ("query", "expected"),
     [
         ("显热热负荷怎么计算", "01_sensible_heat"),
-        ("加热器功率的公式是什么", "01_sensible_heat"),
+        ("加热器功率的公式是什么", "02_heat_assumptions"),
         ("heat duty 计算公式", "01_sensible_heat"),
         ("1000 kg/h 换算为 kg/s", "03_mass_flow"),
         ("公斤每小时转每秒的质量流率", "03_mass_flow"),
         ("两股物流混合后的盐质量分数怎么计算", "10_mixing_balance"),
         ("混配后含盐率计算", "10_mixing_balance"),
-        ("摄氏温差和开尔文温差", "04_temperature_difference"),
+        ("摄氏温差和开尔文温差", "16_bipm_temperature_interval"),
         ("升温发生蒸发时可以直接使用简化热负荷公式吗", "02_heat_assumptions"),
-        ("没有给出比热容能计算吗", "06_specific_heat"),
+        ("没有给出比热容能计算吗", "19_iupac_heat_capacity_basis"),
     ],
 )
 def test_retrieval_with_paraphrases(knowledge: KnowledgeBase, query: str, expected: str) -> None:
@@ -120,3 +129,19 @@ def test_empty_directory_and_plain_text(tmp_path: Path) -> None:
     assert hit["title"] == "flow"
     assert hit["source"] == "来源未注明"
     assert populated.version != empty.version
+
+
+def test_inventory_preserves_the_actual_relative_file_path(tmp_path: Path) -> None:
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "HEAT.MD").write_text("# 显热\n来源：测试作者\n\n热负荷公式。", encoding="utf-8")
+    assert KnowledgeBase(tmp_path).inventory()[0]["file_path"] == "nested/HEAT.MD"
+
+
+def test_same_stem_markdown_and_text_are_rejected_instead_of_sharing_citation_ids(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "heat.md").write_text("# 资料甲\n来源：作者甲\n\n显热公式。", encoding="utf-8")
+    (tmp_path / "heat.txt").write_text("# 资料乙\n来源：作者乙\n\n不同计算条件。", encoding="utf-8")
+    with pytest.raises(ValueError, match="知识文档编号重复"):
+        KnowledgeBase(tmp_path)

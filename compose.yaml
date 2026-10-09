@@ -1,0 +1,22 @@
+services:
+  chem-agent:
+    build: .
+    image: chem-agent-demo:0.3.2
+    ports:
+      - "127.0.0.1:${CHEM_PORT:-7860}:7860"
+    environment:
+      CHEM_HOST: 0.0.0.0
+      CHEM_PORT: 7860
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      CHEM_REQUEST_TIMEOUT: ${CHEM_REQUEST_TIMEOUT:-60}
+      CHEM_MAX_STEPS: ${CHEM_MAX_STEPS:-12}
+    volumes:
+      - chem-runs:/app/runs
+      - chem-index:/app/build
+      - chem-model-cache:/app/.local
+volumes:
+  chem-runs:
+  chem-index:
+  chem-model-cache:

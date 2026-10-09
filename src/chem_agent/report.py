@@ -142,6 +142,7 @@ def render_report(result: dict) -> str:
         f"- 状态：{_STATUS.get(result.get('status'), '未知状态')}",
     ]
     for field, label in (
+        ("mode", "运行模式"),
         ("started_at", "开始时间"),
         ("finished_at", "结束时间"),
         ("knowledge_version", "知识资料版本"),

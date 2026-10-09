@@ -2,7 +2,6 @@
 .env.*
 !.env.example
 .venv/
-.idea/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
@@ -13,10 +12,3 @@ runs/
 build/
 dist/
 .local/
-node_modules/
-.vite/
-.vite-temp/
-coverage/
-test-results/
-playwright-report/
-*.tsbuildinfo

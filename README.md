@@ -1,31 +1,40 @@
 # 化工知识与计算助手
 
-一个可本机运行、可移交源码的教学演示系统：从 15 张化工知识卡检索依据，调用固定计算工具，并保留计划、参数、结果和来源。前端使用 Vue 3、TypeScript 和 Vite，后端使用 FastAPI 与 smolagents；前后端分别启动，前端通过 `/api` 代理访问后端服务。当前为 Vue 前端改造的开发版本，前端包版本独立于后端 `0.2.0`，尚不代表正式合同验收完成。
+一个可本机运行、可移交源码的化工知识与计算演示系统。资料包括 15 张自编教学卡和 6 张按 BIPM、IUPAC、NIST、MIT OCW 官方资料独立撰写的来源卡。建好索引后，知识检索采用 LightRAG 的图谱与向量混合模式；工作台展示本轮实际检索路径、工具调用及数值引用。
 
 ## 能做什么
 
-- **知识问答**：检索原文、来源和片段编号；相关性不足时说明资料不足。
+- **知识问答**：使用 LightRAG 检索实体关系与原文片段，保留来源和片段编号；索引未就绪时明确显示词法回退。
 - **单位换算**：常用质量、体积、流量、压力、温度及温差，拒绝不兼容量纲。
 - **显热热负荷**：使用明确给出的质量流量、比热和温差，保留前序换算结果的真实引用。
 - **混合衡算**：计算稳态、无反应混合物流的总质量流量及同一组分质量分数。
 - **补充参数与导出**：在原任务上下文中补充数据，生成关联的新运行；导出 Markdown 报告和 JSON 记录。
 
-资料均为项目自编教学说明，非实测物性。相变、反应热、复杂流程模拟和真实物性查询不在当前范围内。
+来源卡不是物性数据库，不能自动填入比热等工况参数。相变、反应热、复杂流程模拟和真实物性查询不在当前范围内。
+
+当前交付版本为 **0.3.2**，按现有七项合同摘要组织实现与验收：[能力映射](docs/CONTRACT_COMPLIANCE.md)、[实际架构](docs/ARCHITECTURE.md)、[全库审查与改造依据](docs/AUDIT_AND_PLAN.md)。系统为一套 Agent 工作流，没有独立多 Agent 协作功能。
+
+## 不用密钥的演示
+
+安装后可以直接执行固定离线流程：
+
+```bash
+uv run python scripts/demo_offline.py
+uv run python scripts/demo_offline.py --flow 2000
+```
+
+真实执行本地资料检索、工具注册表、流量换算、带单位的结果引用和显热计算，分别得到约 **46.44 kW / 92.89 kW**；JSON 和 Markdown 写入忽略目录 `runs/`。记录明确标为 `offline_demo`。此路径不读取密钥，不调用模型或 LightRAG，不证明模型能够自行规划。知识问答及模型驱动的多工具流程按下文配置接收方自己的密钥运行。
 
 ## 安装与启动
 
-后端使用名为 `chem-agent` 的 Conda 环境，Python 3.12；`uv.lock` 锁定 Python 依赖。以下是 Windows PowerShell 首次安装命令，在含 `pyproject.toml` 的项目根目录执行。已有环境时跳过创建：
+需要 Python 3.11–3.13、`uv`；本机使用 Python 3.12。未安装 uv 时可运行 `python -m pip install uv`。首次安装依赖和调用模型需要联网。解压后在含 `pyproject.toml` 的目录执行：
 
-```powershell
-conda create -n chem-agent python=3.12 pip -y
-conda activate chem-agent
-uv export --locked --format requirements-txt --no-emit-project --output-file "$env:TEMP\chem-agent-requirements.txt" > $null
-python -m pip install -r "$env:TEMP\chem-agent-requirements.txt"
-python -m pip install --no-deps -e .
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```bash
+uv sync --locked
+cp .env.example .env
 ```
 
-使用本机已有 Conda、uv 和 Node，不安装全局 npm 组件。前端依赖及安装目录全部位于 `src/chem_agent/web/`，首次安装依赖需要联网。编辑根目录 `.env`，选择一种密钥配置方式：
+Windows PowerShell 将复制命令改为 `Copy-Item .env.example .env`。编辑本机 `.env`，选择一种密钥配置方式：
 
 ```dotenv
 DEEPSEEK_API_KEY=填写自己的密钥
@@ -33,35 +42,27 @@ DEEPSEEK_API_KEY=填写自己的密钥
 # DEEPSEEK_API_KEY_FILE=/absolute/path/to/your-key.txt
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-pro
-CHEM_PORT=7860
+CHEM_PORT=7865
 ```
 
 环境变量优先于 `.env`；直接设置的密钥优先于密钥文件。交付包不含可用密钥，接收方需配置自己的账号。
 
-```powershell
-conda activate chem-agent
-python cli.py doctor
-python app.py
+密钥文件必须在接收方本机存在且可读。若报“无法读取 DEEPSEEK_API_KEY_FILE”，修正本机路径，或清空该项后配置 `DEEPSEEK_API_KEY`；源码包不携带开发机密钥文件。
+
+```bash
+uv run chem-agent doctor
+uv run chem-agent rag-index
+uv run chem-agent ui
 ```
 
-后端 API 默认监听 `http://127.0.0.1:7860`，健康检查地址为 `http://127.0.0.1:7860/api/health`。`doctor` 仅检查配置，不验证模型认证或余额。也可用 `start.bat`（Windows）或 `./start.sh`（macOS/Linux）；脚本使用同名 Conda 环境，不自动安装依赖。PyCharm 解释器应指向该环境的 `python.exe`。
+`rag-index` 首次运行会下载约 90 MB 的本地中文向量模型，并用 DeepSeek 以中文从当前资料抽取实体关系；需要网络、有效密钥并消耗 API 额度。索引持久保存于忽略目录 `build/lightrag/`，源码交付包不包含它。资料有变化后重新执行该命令；`uv run chem-agent rag-status` 可离线检查是否就绪。未建索引时仍可运行旧的词法检索，工作台会标明当前后端。普通 LightRAG 查询也可能调用 DeepSeek 做关键词抽取，其请求不计入主代理的 `model_requests` 数量。
 
-保持后端终端运行，另开终端启动前端（本机已安装依赖，可直接执行 `npm run dev`）：
-
-```powershell
-Set-Location "E:\Python PyCharm\chem-agent\src\chem_agent\web"
-# 首次安装或 package-lock.json 更新后执行 npm ci
-npm run dev
-```
-
-打开 `http://127.0.0.1:5173`，Vite 将 `/api` 请求代理到 `127.0.0.1:7860`；使用这两个一致的本机地址。改动后端端口时同步修改 `web/vite.config.ts` 中的代理目标。Node 版本要求见 `web/package.json` 的 `engines` 字段。所有前端代码、测试、配置、锁文件和 `node_modules` 都保留在 `web/` 中。
-
-日常启动使用后端 `python app.py` 和前端 `npm run dev` 两个终端，页面入口为 `http://127.0.0.1:5173`。需要检查前端编译产物时，在 `web/` 运行 `npm run build`，再运行 `npm run preview`，打开 `http://127.0.0.1:4173`；预览服务同样代理 `/api` 到后端，仅用于本机检查。页面脚本、样式和图标均由前端提供，不从 CDN 加载。DeepSeek 推理仍需联网和有效密钥。
+按上述配置打开 `http://127.0.0.1:7865`；程序默认端口为 `7860`。端口冲突时修改 `CHEM_PORT`。也可用 `./start.sh`（macOS/Linux）或 `start.bat`（Windows）。前端为原生 HTML/CSS/JavaScript，由 FastAPI/uvicorn 提供页面和接口，无需 Node 或前端构建。启动时保持一个服务进程。
 
 ## 工作台操作
 
-1. 选择示例或输入问题，点击“运行”（或 Ctrl/⌘ + Enter）。输入区和结果区保持在同一工作台内。
-2. 在“结论”查看工具数值与模型说明；切换“过程”“依据”核对参数、引用和原文。数值卡取自成功工具输出。
+1. 输入问题，或选用一个问题模板，点击“运行”（或 Ctrl/⌘ + Enter）。输入区和结果区保持在同一工作台内。
+2. 在“结论”查看工具数值与答复；切换“路径”“调用”“依据”核对真实命中的实体、关系、片段、来源，以及调用参数与结果引用。数值卡取自成功工具输出。
 3. 状态为“等待补充”时输入数据并点击“继续”。系统创建关联的新运行，按当前会话上下文重新规划；不恢复旧执行器。
 4. 点击“停止”取消当前任务，待其结束后可“新建任务”。完成、缺参、资料不足、超范围、失败或取消的记录均可查看和导出。新建任务清空当前任务上下文，通过左侧任务记录可重新查看已结束的运行。
 
@@ -69,29 +70,80 @@ npm run dev
 
 同一浏览器会话通过 Cookie 关联，刷新页面可恢复服务内存中的当前状态。界面每个会话保留最近最多 40 轮，非活动会话闲置 24 小时后过期；服务重启后会话和界面历史不恢复，原始 `runs/` 文件仍保留。整个服务同时处理一个模型任务，忙时再次提交会提示稍后重试。当前面向本机演示，未验证生产多人部署。
 
+页面为每次提交生成请求编号；提交响应丢失时可恢复这次已经结束或仍在执行的结果，手工重试也沿用原编号，避免重复执行。幂等记录只在当前会话最近 40 条历史内有效，重启或会话过期后不保留。
+
+热负荷可以引用前序混合衡算的总流量或组分流量，执行器核对依赖和单位后转换为 `kg/s`。有流量换算依赖时仍须用 `$ref`，避免重新抄写数值。
+
+模型驱动的热负荷计算会核对比热是否来自当前问题或用户补参历史中的明确数值和单位，教学算例及助手答复不能充当给定物性。支持 `J/(kg·K)`、`kJ/(kg·K)` 及摄氏温差单位，例如 `4180 J/(kg·K)` 归一化为 `4.18 kJ/(kg·K)`。最新明确给定值覆盖旧值；缺少单位的改值、明确未知或撤回不能重新启用旧值。匹配成功后，调用记录的 `input_provenance` 保存用户消息位置、归一化数值和单位。缺参、冲突或不支持的表达会阻止计算并要求补充。这是针对质量比热的窄表达匹配，其他参数及任意自然语言中的归因仍需人工核对。
+
+已完成计算的 `answer` 由成功工具的数值、输入和全部适用条件生成，展示最多 12 位有效数字，计算保留原始精度；不会把舍入后的中间值拼成精确等式。JSON 的 `model_answer` 保存原模型答复供审计，`answer_source="verified_tools"` 标明纯计算答复来源。当前问题明确要求解释、区别或原理等内容时，`set_plan` 要求计算计划包含检索，`complete` 要求成功检索、真实引用和非空 `explanation` 后才允许完成；仅把解释写在模型的 `answer` 中不能通过。纯计算的旧最终工具接口仍可省略 `explanation`。
+
+复合问题的解释保留在生成答复中，标为 `verified_tools_with_explanation`，原输入另存 `model_explanation`。定性说明可与不同已引用片段的定量原文逐句组合；含数值关系、运算或计算结果的每句必须逐字匹配本轮已引用原文，并标为“来源原文（非本轮计算结果）”。不匹配的定量说明被拒绝，模型可改写后重试。解释请求识别、表达形式和原文匹配均为有限规则，不证明任意知识结论的语义正确。知识问答、缺参或失败说明仍保留模型答复。图谱关联来源是索引中的来源集合，需展开原文逐条核对合并描述。
+
 取消会阻止后续工具调用；已经发出的模型请求可能等待返回或超时，其响应不会继续触发工具。单次请求超时默认 60 秒，可用 `CHEM_REQUEST_TIMEOUT` 调整。失败或取消前已经成功的步骤保留供复核，不表示整个任务成功。
+
+## Docker 与接口
+
+需要 Docker 和 Compose。镜像固定基础镜像摘要、按 `uv.lock` 安装依赖、以非 root 用户运行。Compose 从项目 `.env` 读取**直接密钥** `DEEPSEEK_API_KEY`，宿主机密钥文件路径不会自动挂入容器。无密钥也能启动页面和健康检查，模型任务会明确失败；也可在容器执行离线演示。
+
+```bash
+docker compose up --build -d
+curl http://127.0.0.1:7860/health
+docker compose exec chem-agent python scripts/demo_offline.py
+# 启用真实图谱（需要密钥，会下载模型并消耗 API 额度）
+docker compose exec chem-agent chem-agent rag-index
+docker compose down
+```
+
+端口默认为 `7860`；`.env` 中的 `CHEM_PORT` 只改变宿主机映射端口，容器内部固定为 `7860`。命名卷分别保存记录、索引和向量模型缓存，down 不删除它们。镜像构建上下文与源码包都不包含 `.env`、本机索引、模型缓存或私有记录。
+
+| 接口 | 用途 |
+|---|---|
+| `GET /health` | 服务存活、版本、密钥配置布尔值和检索后端；不分配 Cookie，不验证远端认证/余额 |
+| `GET /api/bootstrap`、`GET /api/session` | 页面资料/示例/索引状态与当前会话历史 |
+| `POST /api/jobs` | `question`（1–4000字）、可选 `parent_job_id`、可选32位小写十六进制 `client_request_id`；返回202 |
+| `GET /api/jobs/{job_id}` | 当前状态、计划、实际调用与证据；轮询到 finished |
+| `POST /api/jobs/{job_id}/cancel` | 请求取消当前会话任务 |
+| `GET /api/jobs/{job_id}/report.md`、`trace.json` | 下载终态报告/追溯；未结束返回409 |
+| `GET /api/knowledge/{doc_id}` | 查看实际知识卡 |
+
+API 为本机工作台服务；同会话用 Cookie，写入请求须提供与访问地址相同的 Origin。相同请求编号和相同输入返回原任务；复用编号修改输入返回409。422表示输入格式错误，404表示任务/资料不存在或不属于当前会话，403表示访问地址/Origin不允许。每个响应含 `X-Request-ID`；日志只记录路由、编号、状态和延迟，不记录问题正文。
+
+```bash
+mkdir -p .local
+curl -c .local/api-cookies.txt http://127.0.0.1:7860/api/bootstrap
+curl -b .local/api-cookies.txt -H 'Origin: http://127.0.0.1:7860' \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"请将2.5 MPa换算成kPa。","client_request_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' \
+  http://127.0.0.1:7860/api/jobs
+```
+
+用返回的 job_id 查询结果。每个新输入需使用新的 client_request_id；示例的固定编号用于演示重试。
 
 ## 常用命令
 
-在项目根目录运行。`doctor`、`index`、`search` 和默认测试不调用模型。
+在项目根目录运行。`doctor`、`index`、`search`、`rag-status` 和默认测试不调用模型；`rag-index`、工作台任务以及已就绪索引上的 LightRAG 查询可能调用 DeepSeek。
 
 | 命令 | 用途 |
 | --- | --- |
-| `python cli.py doctor` | 检查 Python、资料数量和密钥是否配置；不验证远端认证或余额 |
-| `python cli.py index` | 重建资料索引并写入 `build/knowledge_manifest.json` |
-| `python cli.py search "显热热负荷计算"` | 离线检索知识卡 |
-| `python cli.py run "请将2.5 MPa换算成kPa。"` | 调用实际模型执行任务，消耗 API 额度 |
-| `python app.py` | 启动本机后端 API 服务 |
-| `python -m pytest` | 运行离线 Python 回归测试 |
-| `npm run typecheck` / `npm run lint` / `npm run format:check` / `npm test` | 在 `web/` 执行前端类型、规范、Prettier 格式及 Vitest 检查 |
-| `npm run build` | 在 `web/` 编译交付页面到 `dist/` |
-| `python scripts/validate_live.py` | 重新执行 8 个真实模型案例，消耗 API 额度 |
-| `python scripts/package.py` | 打包源码、知识卡和前端项目；若已有前端构建产物则一并包含 |
+| `uv run chem-agent doctor` | 检查 Python、资料数量和密钥是否配置；不验证远端认证或余额 |
+| `uv run chem-agent index` | 更新离线词法检索资料清单 `build/knowledge_manifest.json` |
+| `uv run chem-agent search "显热热负荷计算"` | 离线词法检索知识卡 |
+| `uv run chem-agent rag-index` | 构建 LightRAG 图谱与向量索引，下载向量模型并调用 DeepSeek |
+| `uv run chem-agent rag-status` | 离线检查当前资料对应的 LightRAG 索引状态 |
+| `uv run chem-agent run "请将2.5 MPa换算成kPa。"` | 调用实际模型执行任务，消耗 API 额度 |
+| `uv run chem-agent ui` | 启动本机工作台 |
+| `uv run pytest` | 运行离线回归测试 |
+| `node --test tests/frontend_state.test.cjs` | 可选前端状态回归；已使用 Node 24 验证，运行系统本身不需要 Node |
+| `uv run python scripts/validate_live.py` | 执行原 8 案例、混合后加热及温度换算解释，共 10 案例；核对工具引用、答复数值/单位/条件与解释，消耗 API 额度 |
+| `uv run python scripts/package.py` | 生成带版本号的源码交付 ZIP |
+
+真实验收可用 `--index-root /path/to/project --backend lightrag` 复用知识版本相同且已就绪的索引和向量缓存，仍使用当前项目的代码、模型配置、知识卡与 `runs/`。`--backend auto` 使用实际可用后端；`--backend lexical` 要求索引未就绪，已就绪时会在模型调用前报错。报告记录所测提交、源码哈希和实际检索后端，并单独统计被拒工具批次、工具错误及最终答复重试；恢复标志只说明执行终态，仍须通过该案例的业务验收。
 
 命令行补参时，用前一结果的 `run_id` 替换 `RUN_ID`；指定记录须存在于本机 `runs/`：
 
 ```bash
-python cli.py run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热损失。" --follow-up RUN_ID
+uv run chem-agent run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热损失。" --follow-up RUN_ID
 ```
 
 ## 运行记录与维护
@@ -101,12 +153,11 @@ python cli.py run "比热为4.18 kJ/(kg·K)，假设单相、恒比热且无热�
 
 模型请求证据省略私密推理，已知密钥会脱敏。记录仍可能含用户输入及业务数据，分享前应检查；脱敏不等于自动识别全部敏感业务信息。
 
+运行模式区分模型驱动的 `live`、固定离线演示的 `offline_demo`，以及模型尚未开始的 `not_started`。无密钥等启动失败可以导出记录，但不作为真实模型验证；请求次数以 JSON 中保存的实际记录为准。
+
 ```text
 src/chem_agent/       模型、执行器、计算、检索、API 与报告导出
-src/chem_agent/web/   Vue / TypeScript 源码、配置、测试及 npm 锁文件
-  src/              前端组件、API 客户端、状态和样式
-  dist/             可离线提供的编译页面（构建生成）
-  node_modules/     本机前端开发依赖（安装生成）
+src/chem_agent/web/   浏览器工作台 HTML/CSS/JavaScript
 data/knowledge/      可编辑的 Markdown 教学知识卡
 examples/tasks.json  演示及真实验证题目
 tests/               离线回归测试
@@ -114,26 +165,22 @@ scripts/             真实验证和白名单打包
 docs/validation/     随包提供的验证证据
 ```
 
-知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改后新任务从源文件重建索引；运行 `index` 更新资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。
+知识卡以 `# 标题` 和 `来源：…` 开头，正文可用 `##` 分段。修改资料后运行 `rag-index` 重建 LightRAG 索引；运行 `index` 更新离线资料清单，重启服务刷新页面资料库的清单和正文。不要将未核验的物性数值作为通用参数加入资料。交付包排除 `.env`、`.venv`、`.local`、`build/` 和原始 `runs/`。选型、来源及证据边界见[检索与工具链升级说明](docs/检索与工具链升级.md)。
 
-源码交付包包含前端源码、`package-lock.json` 及已有的可选 `web/dist`，排除 `.env`、虚拟环境、`node_modules`、开发缓存、`.local` 和原始 `runs/`。Python wheel 仅分发后端 Python 包，前端项目通过源码 ZIP 单独提供。每个交付 ZIP 附带 SHA-256 文件。
-
-前端依赖包独立于源码包，包含本机 `node_modules`、npm 锁文件及平台清单，不包含 Node 安装程序。离线接收方需自行提供兼容 Node，核对相同 Windows/CPU 架构、Node 版本以及 `offline-dependencies.json` 中锁文件哈希后，再将依赖包中的 `node_modules` 解压到对应项目的 `web/`；不要覆盖不同版本项目的锁文件。使用 `npm run dev` 或 `npm run preview` 时需要前端 Node 环境与 `node_modules`。Python 离线安装环境不包含在这两个 ZIP 中。
+同一相对位置不得同时存在同 stem 的 `.md` / `.txt` 文件，避免重复文档与引用编号。索引校验包含向量解码、维度、记录匹配、有限值和完整 GraphML 解析；LightRAG 的共享存储按目录及资料版本隔离，保留0.3.0已有磁盘结构。
 
 ## 验证范围
 
-2026-10-05 完成 API 独立启动调整：25 项 API/打包回归测试及 Ruff 检查通过；实际启动后端 `7860` 和前端 `5173`，验证 Vue 页面、15 张知识卡、会话及代理校验正常，浏览器控制台无错误。后端页面与静态资源路由返回 404；Python wheel 已核对只包含后端包。本次未调用真实模型 API。
+`0.3.2` 已通过 **361 项 Python 离线测试、21 项前端状态测试**、Ruff 检查、格式检查及锁定依赖同步。当前版本的验证证据见[交付验证清单](docs/validation/v0.3.2/checks.json)和[真实回归报告](docs/validation/v0.3.2/live-regression-report.md)。真实验收覆盖原 8 案例及 `mixed_heat`、`temperature_explanation`，共 10 案例；离线回归与真实模型结果分别记录，逐案结果按所测提交和源码哈希核对。
 
-2026-10-04 完成 Windows 本机检查：Conda `chem-agent` / Python 3.12.14。前后端分离阶段 **161 项 Python 测试**通过；随后界面优化阶段通过 **33 项前端测试、23 项后端 UI/API 回归测试**。TypeScript、ESLint、Prettier 及最新前端构建通过，Python 分离阶段 Ruff 检查通过。前端 8 项业务请求均与后端接口对应。浏览器通过离线测试模型驱动真实本地检索与计算工具，检查热负荷、前序结果引用、补参关联、取消、刷新恢复、知识卡浏览和两种导出；桌面、平板及手机尺寸无横向溢出，控制台无错误。最新源码 ZIP 已更新；独立前端依赖 ZIP 沿用已核验版本，依赖未变。界面见[当前页面](docs/validation/vue-local/workbench.png)。
+当前完整 10 案例真实 LightRAG 验收及最后 3 个比热边界针对性案例均通过，接受记录共 56 次主代理请求成功。前两轮发现的业务失败与一次请求超时仍保留在报告中；提交和源码哈希分别绑定完整复验及最后针对性修复。比热未知而含教材示例时，模型提交的 4.18 被执行器阻断，最终请求补参。详见[真实复验报告](docs/validation/v0.3.2/live-regression-report.md)。
 
-界面优化保留重新连接时的输入草稿，后台标签页降低轮询频率，知识卡缓存合并重复请求并支持失败重试。工作台采用工程计算布局，区分公式示例与实际计算结果；平板与手机使用纵向布局，知识卡正文去除重复标题和来源。
+`0.3.1` 的[历史交付验证清单](docs/validation/v0.3.1/checks.json)包含该版本的离线回归、真实 SDK 的离线存储/查询适配、HTTP 冒烟、Docker 和独立源码复装。API→真实 Agent 循环→检索/计算→导出冒烟只替换模型响应，不计作真实模型调用。该版本在 2026-10-07 完成单位换算、完整 8 案例（词法检索）及 3 个 LightRAG 案例，共 47 次主代理请求成功，另观测到 3 次内部关键词模型请求。人工审阅发现中间舍入等号、部分答案前提省略及图谱逐句支撑粒度问题，详见[历史真实回归报告](docs/validation/v0.3.1/live-regression-report.md)。下列旧版真实记录按其版本保留，不作为当前版本复验。
 
-本轮未配置可用 DeepSeek Key，未发起真实模型请求。离线测试入口只在开发检查中临时使用，不属于正式应用的运行模式。
+`0.3.0` 在 macOS/Python 3.12 上通过 **174 项 Python 离线测试、15 项前端状态测试**、Ruff 检查、格式检查、JavaScript 语法检查和离线锁定依赖安装。实际使用 DeepSeek 从 21 张资料卡构建中文 LightRAG 索引，生成 21 个片段、180 个实体和 235 条关系。真实 `mix` 检索返回中文实体、关联关系及原文片段；10 份图谱支撑片段中有 7 份不在本轮前 3 个命中内，工作台会单独标明并提供原文和出处。浏览器中的显热样例经检索、单位换算、计算三个工具步骤得到 **46.4444 kW**，计算实际引用上一步 `s2.value`。
 
-以下为改造前 `0.2.0` 的历史验证记录，不代表当前 Vue 前端已通过真实模型验收：旧版通过 **157 项 Python 离线测试、12 项前端状态测试**及 Ruff 检查。2026-10-02 在旧工作台发起三轮真实 DeepSeek 任务：缺参、补参和独立热负荷；两次计算均得到 **46.44 kW**。共 9 次模型请求成功，保留补参关联和换算结果引用。
+`0.3.0` 的历史浏览器检查覆盖默认视口和 `390×796` 窄屏，确认路径中的实体关系、可点开的官方来源、实际工具调用和单位换算引用可见。索引与向量模型缓存在本机忽略目录，不包含于源码包；索引目录和查询缓存采用本机私有权限，索引残缺时会显式退回词法检索。新环境需配置模型服务后执行一次 `rag-index`。图谱关系是检索线索，并非物性数据的实验验证。
 
-旧版浏览器验证覆盖补参、标签切换、工具输入输出、资料浏览、Markdown/JSON 下载及刷新恢复。旧版布局尺寸检查覆盖 `1440×852`、`662×745`、`390×796`；独立解压复装检查覆盖锁定依赖、无密钥配置、15 卡索引、157 项测试及页面资源/API。
+`0.3.0` 实测细节见[该版检查记录](docs/validation/v0.3.0/checks.json)。`0.2.0` 的 157 项 Python 测试、12 项前端测试、三轮 DeepSeek 任务及界面截图保留在[历史检查记录](docs/validation/v0.2.0/checks.json)；其结果不充当当前 RAG 的新验证证据。
 
-详见[检查记录](docs/validation/v0.2.0/checks.json)、[技术与验证报告](docs/技术与验证报告.md)及[工作台截图](docs/validation/v0.2.0/workbench.png)。旧版 8 个模型案例单独保留作历史记录。
-
-当前 Vue 改造的本机检查应区分 Python 离线测试、前端测试/构建、浏览器交互和真实模型调用；前三项不能替代真实 API 验证。完全离线模型、生产多人部署及未收录主题的准确率不在当前验证范围内。工具输入仍需与用户给定参数核对。
+未验证 Windows、完全离线模型、生产多人部署及未收录主题的准确率。工具输入仍需与用户给定参数核对。

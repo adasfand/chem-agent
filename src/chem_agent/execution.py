@@ -5,11 +5,18 @@ from __future__ import annotations
 import inspect
 import re
 from copy import deepcopy
+from time import perf_counter
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from chem_agent.answers import (
+    calculation_answer,
+    calculation_explanation,
+    requires_concept_explanation,
+)
 from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
+from chem_agent.inputs import supplied_specific_heat
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.trace import RunTrace, utc_now
 
@@ -25,9 +32,16 @@ class PlanStep(BaseModel):
 
 
 class Execution:
-    def __init__(self, knowledge: KnowledgeBase, trace: RunTrace):
+    def __init__(
+        self,
+        knowledge: KnowledgeBase,
+        trace: RunTrace,
+        trusted_user_inputs: list[str] | None = None,
+    ):
         self.knowledge = knowledge
         self.trace = trace
+        self.trusted_user_inputs = trusted_user_inputs
+        self.requires_explanation = requires_concept_explanation(trace.data["question"])
         self.results: dict[str, dict] = {}
         self.functions = {
             "search_knowledge": knowledge.search,
@@ -44,6 +58,14 @@ class Execution:
         if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
             raise ValueError("计划需要包含 1–6 个步骤。")
         parsed = [PlanStep.model_validate(step) for step in steps]
+        if (
+            self.requires_explanation
+            and any(step.tool_name != "search_knowledge" for step in parsed)
+            and not any(step.tool_name == "search_knowledge" for step in parsed)
+        ):
+            raise ValueError(
+                "用户明确要求概念解释；请在计划中加入 search_knowledge，再执行换算或计算。"
+            )
         seen = set()
         for step in parsed:
             if step.step_id in seen or not set(step.depends_on) <= seen:
@@ -125,6 +147,7 @@ class Execution:
     def execute(self, tool_name: str, step_id: str, arguments: dict) -> dict:
         if self.trace.data["status"] != "running":
             raise ValueError("任务已经结束，不能继续调用工具。")
+        started = perf_counter()
         call = {
             "call_id": f"call_{len(self.trace.data['calls']) + 1}",
             "step_id": step_id,
@@ -142,16 +165,27 @@ class Execution:
                 raise ValueError("已达到本次任务的工具调用次数上限。")
             if not step or step["tool_name"] != tool_name:
                 raise ValueError("工具和步骤必须与已登记计划一致。")
-            if step["status"] == "succeeded":
+            retry_empty_search = (
+                tool_name == "search_knowledge"
+                and step_id in self.results
+                and not self.results[step_id]["hits"]
+            )
+            if step["status"] == "succeeded" and not retry_empty_search:
                 raise ValueError("此步骤已完成，请使用其现有结果。")
             if not all(dep in self.results for dep in step["depends_on"]):
                 raise ValueError("前序步骤未成功，不能执行依赖计算。")
+            if any(
+                "hits" in self.results[dep] and not self.results[dep]["hits"]
+                for dep in step["depends_on"]
+            ):
+                raise ValueError("前序检索没有证据，不能执行依赖步骤；请先重试该检索。")
             if not isinstance(arguments, dict):
                 raise ValueError("arguments 必须是参数对象。")
             units = {"value": arguments.get("from_unit")} if tool_name == "convert_units" else None
             resolved = self._resolve(arguments, step["depends_on"], call["input_refs"], units=units)
             call["arguments"] = resolved
-            # Converting a flow before heat duty must feed the real conversion output.
+            # A flow conversion dependency requires a real, unit-checked flow
+            # reference; a later mass balance may provide the flow being heated.
             conversion_deps = []
             for prior in self.trace.data["plan"]:
                 if prior["step_id"] in step["depends_on"] and prior["tool_name"] == "convert_units":
@@ -162,17 +196,22 @@ class Execution:
                     conversion_deps.append(prior["step_id"])
             if tool_name == "calc_heat_duty" and conversion_deps:
                 if not any(
-                    r["argument"] == "mass_flow_kg_s"
-                    and r["ref"] in {f"{dep}.value" for dep in conversion_deps}
+                    r["argument"] == "mass_flow_kg_s" and r.get("unit") == "kg/s"
                     for r in call["input_refs"]
                 ):
                     raise ValueError(
-                        "质量流量必须用 {$ref: 'sN.value'} 引用前序换算结果，不能重抄数值。"
+                        "质量流量必须用 $ref 引用已成功依赖步骤的流量结果，不能重抄数值。"
                     )
             try:
                 inspect.signature(self.functions[tool_name]).bind(**resolved)
             except TypeError:
                 raise ValueError("工具参数缺失或存在多余字段，请按工具说明提供参数。") from None
+            if tool_name == "calc_heat_duty" and self.trusted_user_inputs is not None:
+                call["input_provenance"] = [
+                    supplied_specific_heat(
+                        resolved["specific_heat_kj_kg_k"], self.trusted_user_inputs
+                    )
+                ]
             step["status"] = "running"
             self.trace.save()
             output = self.functions[tool_name](**resolved)
@@ -192,13 +231,22 @@ class Execution:
             raise ValueError(str(exc)) from None
         finally:
             call["finished_at"] = utc_now()
+            call["latency_ms"] = round((perf_counter() - started) * 1000, 3)
             self.trace.save()
 
-    def complete(self, answer: str, status: str, citations: list[str]) -> str:
+    def complete(
+        self, answer: str, status: str, citations: list[str], explanation: str | None = ""
+    ) -> str:
+        if self.trace.data["status"] != "running":
+            raise ValueError("任务已经结束，不能改写最终状态或回答。")
         if status not in {"completed", "needs_input", "no_evidence", "failed", "out_of_scope"}:
             raise ValueError("未知任务状态。")
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 16000:
             raise ValueError("回答必须是非空的简短文本。")
+        if explanation is None:
+            explanation = ""
+        if not isinstance(explanation, str) or len(explanation) > 6000:
+            raise ValueError("补充说明需要是最多 6000 字的文本。")
         evidence_ids = {h["chunk_id"] for h in self.trace.data["evidence"]}
         if not isinstance(citations, list) or any(not isinstance(c, str) for c in citations):
             raise ValueError("citations 必须是来源编号列表。")
@@ -210,9 +258,31 @@ class Execution:
             ):
                 raise ValueError("计划尚未全部成功执行，不能声明完成。")
             searches = [o for s, o in self.results.items() if "hits" in o]
-            if searches and not evidence_ids:
-                raise ValueError("检索没有证据，请使用 no_evidence 状态。")
+            if any(not output["hits"] for output in searches):
+                raise ValueError("计划中的检索没有证据，请重试该检索或使用 no_evidence 状态。")
             if evidence_ids and not citations:
                 raise ValueError("回答需要引用本次检索来源。")
+            verified_answer = calculation_answer(self.trace.data["calls"])
+            if verified_answer is not None:
+                if self.requires_explanation:
+                    if not evidence_ids or not citations:
+                        raise ValueError(
+                            "用户要求概念解释；需要成功检索并引用真实来源，不能仅提交数值。"
+                        )
+                    if not explanation.strip():
+                        raise ValueError(
+                            "用户要求的概念解释尚未提交；请填写 final_answer.explanation，"
+                            "不要把解释仅放在 answer，计算部分由程序生成。"
+                        )
+                extra = calculation_explanation(
+                    explanation, self.trace.data["calls"], self.trace.data["evidence"], citations
+                )
+                self.trace.data["model_answer"] = answer
+                self.trace.data["answer_source"] = (
+                    "verified_tools_with_explanation" if extra else "verified_tools"
+                )
+                if explanation.strip():
+                    self.trace.data["model_explanation"] = explanation
+                answer = verified_answer + extra
         self.trace.finish(status, answer, citations)
         return answer

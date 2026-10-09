@@ -185,8 +185,9 @@ def calc_heat_duty(
             "delta_t_k": temperature_change,
         },
         "assumptions": [
-            "稳态显热计算，Q = 质量流量 × 定压比热 × (出口温度 − 入口温度)",
-            "比热在温度区间内视为常数；无相变、反应热及热损失",
+            "单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差",
+            "无化学反应、无相变；忽略热损失、轴功以及动能、位能变化",
+            "比热需明确给定且适用于该温度区间，不由知识卡代填物性",
             "正值表示加热，负值表示冷却；结果单位为 kW",
         ],
     }
@@ -229,7 +230,7 @@ def calc_mass_balance(streams: list[dict]) -> dict[str, Any]:
         "component_flow_kg_h": component_flow,
         "mass_fraction": component_flow / total_flow,
         "assumptions": [
-            "稳态、完全混合；无反应、泄漏或积累",
+            "稳态、完全混合；无反应、无泄漏、无积累",
             "所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1",
             "所有输入及输出质量流量单位为 kg/h",
         ],

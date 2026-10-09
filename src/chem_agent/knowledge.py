@@ -90,11 +90,16 @@ class KnowledgeBase:
         self._matrix = None
         self._title_matrix = None
         digest = hashlib.sha256()
-        files = sorted(
-            path
-            for path in self.directory.rglob("*")
-            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
-        )
+        root = self.directory.resolve()
+        files = []
+        for path in sorted(self.directory.rglob("*")):
+            if path.suffix.lower() not in {".md", ".txt"}:
+                continue
+            if path.is_symlink() or not path.resolve().is_relative_to(root):
+                raise ValueError("知识目录不支持符号链接文件。")
+            if path.is_file():
+                files.append(path)
+        document_ids: set[str] = set()
         for path in files:
             relative = path.relative_to(self.directory).as_posix()
             raw = path.read_bytes()
@@ -106,6 +111,11 @@ class KnowledgeBase:
             if not text.strip():
                 continue
             doc_id = path.relative_to(self.directory).with_suffix("").as_posix()
+            if doc_id in document_ids:
+                raise ValueError(
+                    "知识文档编号重复；同一相对位置不能同时使用同名 .md 和 .txt 文件，请重命名。"
+                )
+            document_ids.add(doc_id)
             title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
             title = title_match.group(1).strip() if title_match else path.stem
             source_match = _SOURCE_PATTERN.search(text)
@@ -115,6 +125,7 @@ class KnowledgeBase:
             self._inventory.append(
                 {
                     "doc_id": doc_id,
+                    "file_path": relative,
                     "title": title,
                     "source": source,
                     "chunk_count": len(chunks),

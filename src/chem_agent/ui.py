@@ -1,8 +1,9 @@
-"""FastAPI service with isolated sessions and one model execution slot."""
+"""Local FastAPI workbench with isolated sessions and one visible model slot."""
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -18,19 +19,20 @@ from urllib.parse import urlsplit
 from dotenv import dotenv_values
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from chem_agent import __version__
 from chem_agent.agent import run_task
 from chem_agent.config import Settings
-from chem_agent.knowledge import KnowledgeBase
+from chem_agent.retrieval import HybridRetriever
 from chem_agent.trace import RunTrace, redact, utc_now
 
 COOKIE_NAME = "chem_session"
 SESSION_TTL = 24 * 60 * 60
 MAX_SESSIONS = 128
 MAX_SESSION_RUNS = 40
+WEB_DIR = Path(__file__).parent / "web"
 TERMINAL_STATUSES = {
     "completed",
     "needs_input",
@@ -40,12 +42,18 @@ TERMINAL_STATUSES = {
     "cancelled",
 }
 _RUN_ID = re.compile(r"\d{8}T\d{6}-[a-f0-9]{10}")
+_REQUEST_ID = re.compile(
+    r"(?:[a-fA-F0-9]{32}|[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12})"
+)
+_JOB_ID = re.compile(r"[a-f0-9]{32}")
+logger = logging.getLogger(__name__)
 
 
 class JobInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     question: str = Field(min_length=1, max_length=4000)
     parent_job_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    client_request_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
 
     @field_validator("question")
     @classmethod
@@ -64,6 +72,8 @@ class _Job:
     result: dict[str, Any]
     history: list[dict[str, str]] = field(default_factory=list)
     parent_run_id: str | None = None
+    parent_job_id: str | None = None
+    client_request_id: str | None = None
     cancel: threading.Event = field(default_factory=threading.Event)
     finished: bool = False
 
@@ -79,7 +89,7 @@ class _Session:
 class _Runtime:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.knowledge = KnowledgeBase(settings.knowledge_dir)
+        self.knowledge = HybridRetriever(settings)
         self.lock = threading.RLock()
         self.sessions: dict[str, _Session] = {}
         self.active_job_id: str | None = None
@@ -148,6 +158,7 @@ class _Runtime:
                         "status": job.result.get("status", "running"),
                         "created_at": job.created_at,
                         "run_id": job.result.get("run_id"),
+                        "client_request_id": job.client_request_id,
                     }
                     for job in reversed(list(session.jobs.values()))
                 ],
@@ -159,6 +170,7 @@ class _Runtime:
                 "job_id": job.id,
                 "finished": job.finished,
                 "cancel_requested": job.cancel.is_set(),
+                "client_request_id": job.client_request_id,
                 "result": self.clean_result(job.result),
             }
 
@@ -171,6 +183,22 @@ class _Runtime:
 
     def start(self, session: _Session, payload: JobInput) -> _Job:
         with self.lock:
+            if payload.client_request_id:
+                existing = next(
+                    (
+                        job
+                        for job in session.jobs.values()
+                        if job.client_request_id == payload.client_request_id
+                    ),
+                    None,
+                )
+                if existing is not None:
+                    if (
+                        existing.question != payload.question
+                        or existing.parent_job_id != payload.parent_job_id
+                    ):
+                        raise HTTPException(409, "请求编号已用于其他输入，请新建任务后重试。")
+                    return existing
             history: list[dict[str, str]] = []
             parent_run_id = None
             if payload.parent_job_id:
@@ -196,6 +224,8 @@ class _Runtime:
                 created_at=created_at,
                 history=history,
                 parent_run_id=parent_run_id,
+                parent_job_id=payload.parent_job_id,
+                client_request_id=payload.client_request_id,
                 result={
                     "status": "running",
                     "question": payload.question,
@@ -263,6 +293,7 @@ class _Runtime:
                     self.settings.public(),
                     self.knowledge.version,
                     self.secrets,
+                    mode="not_started",
                 )
                 result = trace.result()
             except OSError:
@@ -271,6 +302,9 @@ class _Runtime:
         return result
 
     def worker(self, session: _Session, job: _Job) -> None:
+        started = time.perf_counter()
+        error_type = "-"
+
         def progress(result: dict) -> None:
             snapshot = deepcopy(result)
             snapshot["parent_run_id"] = job.parent_run_id
@@ -292,7 +326,8 @@ class _Runtime:
                 )
             if result.get("status") not in TERMINAL_STATUSES:
                 result = self.fallback(job, "failed", "本次任务未正常结束，请重试。")
-        except Exception:
+        except Exception as exc:
+            error_type = type(exc).__name__
             status = "cancelled" if job.cancel.is_set() else "failed"
             answer = (
                 "任务已取消。" if status == "cancelled" else "任务执行失败，请检查本机配置后重试。"
@@ -302,7 +337,8 @@ class _Runtime:
         result["parent_run_id"] = job.parent_run_id
         try:
             self.persist_final(result)
-        except (OSError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError) as exc:
+            error_type = type(exc).__name__
             result["record_warning"] = "本地运行记录保存失败；可从当前页面导出。"
         finally:
             with self.lock:
@@ -310,6 +346,17 @@ class _Runtime:
                 job.finished = True
                 session.active_job_id = None
                 self.active_job_id = None
+        run_id = result.get("run_id", "")
+        if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
+            run_id = "-"
+        logger.info(
+            "task_finished job_id=%s run_id=%s status=%s latency_ms=%.3f error_type=%s",
+            job.id,
+            run_id,
+            result["status"],
+            (time.perf_counter() - started) * 1000,
+            error_type,
+        )
 
 
 def _server_config(settings: Settings) -> dict:
@@ -366,21 +413,31 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.middleware("http")
     async def local_session(request: Request, call_next):
+        started = time.perf_counter()
+        supplied_id = request.headers.get("x-request-id", "")
+        request_id = (
+            supplied_id.lower() if _REQUEST_ID.fullmatch(supplied_id) else secrets.token_hex(16)
+        )
+        request.state.request_id = request_id
         origin = _origin_parts(f"{request.url.scheme}://{request.headers.get('host', '')}")
         new_session = False
         current = None
+        error_type = "-"
         try:
             if not origin or origin[1] not in allowed_hosts:
                 raise HTTPException(403, "不允许此访问地址。")
             if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
                 if _origin_parts(request.headers.get("origin", "")) != origin:
                     raise HTTPException(403, "仅允许从当前页面提交请求。")
-            current, new_session = runtime.session(request.cookies.get(COOKIE_NAME))
-            request.state.chem_session = current
+            # Health probes must not allocate or evict browser sessions.
+            if request.url.path != "/health":
+                current, new_session = runtime.session(request.cookies.get(COOKIE_NAME))
+                request.state.chem_session = current
             response = await call_next(request)
         except HTTPException as exc:
             response = JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-        except Exception:
+        except Exception as exc:
+            error_type = type(exc).__name__
             response = JSONResponse(
                 {"detail": "服务暂时无法处理请求，请稍后重试。"}, status_code=500
             )
@@ -397,21 +454,61 @@ def create_app(settings: Settings) -> FastAPI:
         response.headers["Pragma"] = "no-cache"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Request-ID"] = request_id
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        job_id = getattr(request.state, "job_id", request.path_params.get("job_id", ""))
+        if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
+            job_id = "-"
+        method = (
+            request.method
+            if request.method in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+            else "OTHER"
+        )
+        logger.info(
+            "http_request request_id=%s method=%s route=%s status=%d "
+            "latency_ms=%.3f job_id=%s error_type=%s",
+            request_id,
+            method,
+            route,
+            response.status_code,
+            (time.perf_counter() - started) * 1000,
+            job_id,
+            error_type,
+        )
         return response
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(_request, _exception):
         return JSONResponse(
-            {"detail": "输入格式无效：请输入 1–4000 字的问题和有效的父任务编号。"},
+            {"detail": "输入格式无效：请输入 1–4000 字的问题和有效的任务、请求编号。"},
             status_code=422,
         )
 
-    @app.get("/api/health")
+    @app.get("/")
+    def index():
+        path = WEB_DIR / "index.html"
+        if not path.is_file():
+            raise HTTPException(503, "页面资源尚未就绪。")
+        return FileResponse(path, media_type="text/html")
+
+    @app.get("/health")
     def health():
         return {
             "status": "ok",
             "version": __version__,
+            "model_configured": bool(settings.api_key),
+            "retrieval": {
+                "state": runtime.knowledge.index_status.get("state"),
+                "backend": runtime.knowledge.index_status.get("backend"),
+            },
         }
+
+    @app.get("/static/{name}")
+    def static_file(name: str):
+        types = {"style.css": "text/css", "app.js": "application/javascript"}
+        if name not in types or not (WEB_DIR / name).is_file():
+            raise HTTPException(404, "资源不存在。")
+        return FileResponse(WEB_DIR / name, media_type=types[name])
 
     @app.get("/api/bootstrap")
     def bootstrap(request: Request):
@@ -424,6 +521,7 @@ def create_app(settings: Settings) -> FastAPI:
                 for e in examples
             ],
             "knowledge": inventory,
+            "index_status": runtime.knowledge.index_status,
             "session": runtime.session_view(request.state.chem_session),
         }
 
@@ -433,7 +531,9 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.post("/api/jobs", status_code=202)
     def new_job(payload: JobInput, request: Request):
-        return runtime.job_view(runtime.start(request.state.chem_session, payload))
+        job = runtime.start(request.state.chem_session, payload)
+        request.state.job_id = job.id
+        return runtime.job_view(job)
 
     @app.get("/api/jobs/{job_id}")
     def job_info(job_id: str, request: Request):
@@ -488,11 +588,19 @@ def create_app(settings: Settings) -> FastAPI:
 
 def launch(settings: Settings) -> None:
     import uvicorn
+    from uvicorn.config import LOGGING_CONFIG
 
     config = _server_config(settings)
+    log_config = deepcopy(LOGGING_CONFIG)
+    log_config["loggers"]["chem_agent.ui"] = {
+        "handlers": ["default"],
+        "level": "INFO",
+        "propagate": False,
+    }
     uvicorn.run(
         create_app(settings),
         host=config.get("CHEM_HOST") or "127.0.0.1",
         port=int(config.get("CHEM_PORT") or 7860),
         access_log=False,
+        log_config=log_config,
     )

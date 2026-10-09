@@ -1,0 +1,378 @@
+{
+  "tested_code_commit": "877f95db4ff63ef0f40d217cd03f07e8c8a1080b",
+  "model": "deepseek-v4-pro",
+  "mode": "live",
+  "started_at": "2026-10-07T13:12:57.750253+00:00",
+  "finished_at": "2026-10-07T13:16:59.198428+00:00",
+  "knowledge_version": "70991c947a1369d67bc9b593eafd8d0b7fbcf9b136dc40af5b1ff58fde396d68",
+  "index_reuse": "Current code with matching retained primary index; 21 documents/21 chunks; no rebuilding or embedding download.",
+  "automatic_checks": {
+    "passed": 11,
+    "failed": 0,
+    "lexical_cases": 8,
+    "lightrag_cases": 3
+  },
+  "manual_review": "Numeric results, supplied parameters, real references and citation provenance checked; answer presentation issues remain.",
+  "main_agent_model_requests": 47,
+  "main_agent_request_failures": 0,
+  "main_agent_tokens": {
+    "input_tokens": 262145,
+    "output_tokens": 6513
+  },
+  "sdk_keyword_requests": {
+    "observed_http_200": 3,
+    "basis": "Runtime logs and three newly cached keyword results",
+    "included_in_main_request_count": false,
+    "token_usage": "not_instrumented"
+  },
+  "recovered_guard_errors": 6,
+  "cases": [
+    {
+      "case": "knowledge",
+      "label": "知识问答",
+      "run_id": "20261007T131257-d70f34df6d",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "公式、输入条件及适用边界有来源支持",
+      "model_requests": 3,
+      "latency_ms": 7931.887,
+      "retrieval_backends": [
+        "lexical"
+      ],
+      "retrieval_counts": [
+        {}
+      ],
+      "recovered_errors": [],
+      "citations": [
+        "02_heat_assumptions:af704ba252"
+      ],
+      "actual_references": []
+    },
+    {
+      "case": "heat",
+      "label": "1000 kg/h 显热",
+      "run_id": "20261007T131305-1f5d79e8b3",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "46.4444444444 kW",
+      "model_requests": 6,
+      "latency_ms": 16117.483,
+      "retrieval_backends": [
+        "lexical"
+      ],
+      "retrieval_counts": [
+        {}
+      ],
+      "recovered_errors": [
+        "Error:\n每次回复只允许调用一个工具；final_answer 也必须单独调用。请纠正后重试。\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [
+        "01_sensible_heat:9ea487a0e7",
+        "01_sensible_heat:0ad13ea9b8",
+        "02_heat_assumptions:af704ba252"
+      ],
+      "actual_references": [
+        {
+          "tool": "calc_heat_duty",
+          "refs": [
+            {
+              "argument": "mass_flow_kg_s",
+              "ref": "s2.value",
+              "value": 0.2777777777777778,
+              "source_value": 0.2777777777777778,
+              "source_unit": "kg/s",
+              "unit": "kg/s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "heat_changed_input",
+      "label": "2000 kg/h 显热",
+      "run_id": "20261007T131321-75edf9f5dd",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "92.8888888889 kW",
+      "model_requests": 6,
+      "latency_ms": 11019.162,
+      "retrieval_backends": [
+        "lexical"
+      ],
+      "retrieval_counts": [
+        {}
+      ],
+      "recovered_errors": [
+        "Error:\n每次回复只允许调用一个工具；final_answer 也必须单独调用。请纠正后重试。\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [
+        "01_sensible_heat:9ea487a0e7",
+        "01_sensible_heat:0ad13ea9b8",
+        "02_heat_assumptions:af704ba252"
+      ],
+      "actual_references": [
+        {
+          "tool": "calc_heat_duty",
+          "refs": [
+            {
+              "argument": "mass_flow_kg_s",
+              "ref": "s2.value",
+              "value": 0.5555555555555556,
+              "source_value": 0.5555555555555556,
+              "source_unit": "kg/s",
+              "unit": "kg/s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "balance",
+      "label": "混合衡算",
+      "run_id": "20261007T131332-7c9152408b",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "500 kg/h；盐 5 kg/h；质量分数 1%",
+      "model_requests": 4,
+      "latency_ms": 9344.928,
+      "retrieval_backends": [
+        "lexical"
+      ],
+      "retrieval_counts": [
+        {}
+      ],
+      "recovered_errors": [],
+      "citations": [
+        "08_total_mass_balance:54f94545ed",
+        "09_component_balance:6c1e2b3262",
+        "10_mixing_balance:214de8fc60"
+      ],
+      "actual_references": []
+    },
+    {
+      "case": "units",
+      "label": "压力换算",
+      "run_id": "20261007T131342-3fd44908c1",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "2500 kPa",
+      "model_requests": 4,
+      "latency_ms": 6319.966,
+      "retrieval_backends": [],
+      "retrieval_counts": [],
+      "recovered_errors": [
+        "Error:\nError executing tool 'convert_units' with arguments {'step_id': 's1', 'arguments': {'value': 2.5, 'from_unit': 'MPa', 'to_unit': 'kPa'}}: ValueError: 工具和步骤必须与已登记计划一致。\nPlease try again or use another tool\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [],
+      "actual_references": []
+    },
+    {
+      "case": "missing_parameter",
+      "label": "缺少比热",
+      "run_id": "20261007T131348-973a9ee564",
+      "status": "needs_input",
+      "automatic_passed": true,
+      "result": "needs_input；未计算，要求提供比热",
+      "model_requests": 1,
+      "latency_ms": 2928.392,
+      "retrieval_backends": [],
+      "retrieval_counts": [],
+      "recovered_errors": [],
+      "citations": [],
+      "actual_references": []
+    },
+    {
+      "case": "follow_up",
+      "label": "历史输入补参",
+      "run_id": "20261007T131351-c022fbaf74",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "46.4444444444 kW；正确回用历史用户流量与温度",
+      "model_requests": 6,
+      "latency_ms": 13100.654,
+      "retrieval_backends": [
+        "lexical"
+      ],
+      "retrieval_counts": [
+        {}
+      ],
+      "recovered_errors": [
+        "Error:\n每次回复只允许调用一个工具；final_answer 也必须单独调用。请纠正后重试。\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [
+        "01_sensible_heat:9ea487a0e7",
+        "01_sensible_heat:0ad13ea9b8",
+        "02_heat_assumptions:af704ba252"
+      ],
+      "actual_references": [
+        {
+          "tool": "calc_heat_duty",
+          "refs": [
+            {
+              "argument": "mass_flow_kg_s",
+              "ref": "s2.value",
+              "value": 0.2777777777777778,
+              "source_value": 0.2777777777777778,
+              "source_unit": "kg/s",
+              "unit": "kg/s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "incompatible_units",
+      "label": "非法单位",
+      "run_id": "20261007T131404-e52dd16d6c",
+      "status": "out_of_scope",
+      "automatic_passed": true,
+      "result": "out_of_scope；拒绝 kg→K",
+      "model_requests": 1,
+      "latency_ms": 2405.921,
+      "retrieval_backends": [],
+      "retrieval_counts": [],
+      "recovered_errors": [],
+      "citations": [],
+      "actual_references": []
+    },
+    {
+      "case": "lightrag_knowledge",
+      "label": "LightRAG 知识问答",
+      "run_id": "20261007T131502-8cb0aa2027",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "mix 检索；6 实体、3 关系、3 命中、8 图谱来源",
+      "model_requests": 3,
+      "latency_ms": 11672.167,
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "retrieval_counts": [
+        {
+          "entities": 6,
+          "relationships": 3,
+          "chunks": 3,
+          "graph_sources": 8
+        }
+      ],
+      "recovered_errors": [],
+      "citations": [
+        "doc-9d74e039ac796952f5b66af1-chunk-000",
+        "doc-78a5c08ab98d68af7e60add9-chunk-000",
+        "doc-932ed8a134107dcf2693c301-chunk-000"
+      ],
+      "actual_references": []
+    },
+    {
+      "case": "lightrag_heat",
+      "label": "LightRAG 显热",
+      "run_id": "20261007T131513-b1e94ca158",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "46.4444444444 kW；7 实体、5 关系、3 命中",
+      "model_requests": 6,
+      "latency_ms": 18512.369,
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "retrieval_counts": [
+        {
+          "entities": 7,
+          "relationships": 5,
+          "chunks": 3,
+          "graph_sources": 6
+        }
+      ],
+      "recovered_errors": [
+        "Error:\n每次回复只允许调用一个工具；final_answer 也必须单独调用。请纠正后重试。\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [
+        "doc-9d74e039ac796952f5b66af1-chunk-000",
+        "doc-697a2844b6469578bf7f4cb1-chunk-000"
+      ],
+      "actual_references": [
+        {
+          "tool": "calc_heat_duty",
+          "refs": [
+            {
+              "argument": "mass_flow_kg_s",
+              "ref": "s2.value",
+              "value": 0.2777777777777778,
+              "source_value": 0.2777777777777778,
+              "source_unit": "kg/s",
+              "unit": "kg/s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "lightrag_mixed_heat",
+      "label": "LightRAG 混合→换算→加热",
+      "run_id": "20261007T131641-d83e695602",
+      "status": "completed",
+      "automatic_passed": true,
+      "result": "500 kg/h；1%；23.2222222222 kW；两级真实 $ref",
+      "model_requests": 7,
+      "latency_ms": 17527.401,
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "retrieval_counts": [
+        {
+          "entities": 8,
+          "relationships": 18,
+          "chunks": 3,
+          "graph_sources": 10
+        }
+      ],
+      "recovered_errors": [
+        "Error:\nError executing tool 'convert_units' with arguments {'step_id': 's3', 'arguments': {'value': {'$ref': 's2.value'}, 'from_unit': 'kg/h', 'to_unit': 'kg/s'}}: ValueError: 结果引用字段不存在。\nPlease try again or use another tool\nNow let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.\n"
+      ],
+      "citations": [
+        "doc-9d74e039ac796952f5b66af1-chunk-000",
+        "doc-b8050f4b2bfb787b807dd0be-chunk-000",
+        "doc-932ed8a134107dcf2693c301-chunk-000"
+      ],
+      "actual_references": [
+        {
+          "tool": "convert_units",
+          "refs": [
+            {
+              "argument": "value",
+              "ref": "s2.total_flow_kg_h",
+              "value": 500.0,
+              "source_value": 500.0,
+              "source_unit": "kg/h",
+              "unit": "kg/h"
+            }
+          ]
+        },
+        {
+          "tool": "calc_heat_duty",
+          "refs": [
+            {
+              "argument": "mass_flow_kg_s",
+              "ref": "s3.value",
+              "value": 0.1388888888888889,
+              "source_value": 0.1388888888888889,
+              "source_unit": "kg/s",
+              "unit": "kg/s"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "quality_findings": [
+    "Rounded intermediate mass flows are displayed with exact equal signs; actual calculations use full precision.",
+    "Some heat answers omit steady-state or no-reaction assumptions that remain present in tool outputs and evidence.",
+    "Graph descriptions combine multiple sources; each source does not support every clause."
+  ],
+  "checker_note": "Rechecked the same actual live trace without model calls after correcting the local checker: requested_arguments holds $ref; arguments holds resolved numbers.",
+  "coverage_limits": [
+    "Focused acceptance examples, not a broad retrieval accuracy benchmark.",
+    "Fresh live UI follow-up, cancellation, timeout and no-evidence cases were not run in this request; existing offline regressions remain separate.",
+    "Follow-up case uses agent history directly, and does not validate API parent_run_id linkage."
+  ]
+}

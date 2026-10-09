@@ -125,3 +125,140 @@ def test_mass_balance_flow_reference_is_converted_to_kg_per_hour(execution):
     assert reference["argument"] == "streams[0].flow_kg_h"
     assert reference["source_unit"] == "kg/s"
     assert reference["unit"] == "kg/h"
+
+
+def mixed_heat_plan():
+    return [
+        {"step_id": "s1", "goal": "换算流量", "tool_name": "convert_units", "depends_on": []},
+        {
+            "step_id": "s2",
+            "goal": "混合衡算",
+            "tool_name": "calc_mass_balance",
+            "depends_on": ["s1"],
+        },
+        {
+            "step_id": "s3",
+            "goal": "混合流股的热负荷",
+            "tool_name": "calc_heat_duty",
+            "depends_on": ["s1", "s2"],
+        },
+    ]
+
+
+def execute_mixed_streams(execution, to_unit="kg/s"):
+    execution.execute(
+        "convert_units", "s1", {"value": 3600, "from_unit": "kg/h", "to_unit": to_unit}
+    )
+    execution.execute(
+        "calc_mass_balance",
+        "s2",
+        {
+            "streams": [
+                {"flow_kg_h": {"$ref": "s1.value"}, "mass_fraction": 0.1},
+                {"flow_kg_h": 1000, "mass_fraction": 0},
+            ],
+        },
+    )
+
+
+@pytest.mark.parametrize("to_unit", ["kg/s", "g/s", "kg/h"])
+@pytest.mark.parametrize(
+    ("field", "expected_flow"),
+    [("total_flow_kg_h", 4600), ("component_flow_kg_h", 360)],
+)
+def test_heat_duty_can_reference_mass_balance_after_flow_conversion(
+    execution, to_unit, field, expected_flow
+):
+    execution.set_plan(mixed_heat_plan())
+    execute_mixed_streams(execution, to_unit)
+    result = execution.execute(
+        "calc_heat_duty",
+        "s3",
+        {
+            "mass_flow_kg_s": {"$ref": f"s2.{field}"},
+            "specific_heat_kj_kg_k": 4.18,
+            "delta_t_k": 40,
+        },
+    )
+    assert result["output"]["heat_duty_kw"] == pytest.approx(expected_flow / 3600 * 4.18 * 40)
+    call = execution.trace.data["calls"][-1]
+    reference = call["input_refs"][0]
+    assert reference["ref"] == f"s2.{field}"
+    assert reference["source_value"] == pytest.approx(expected_flow)
+    assert reference["source_unit"] == "kg/h"
+    assert reference["unit"] == "kg/s"
+    assert reference["value"] == pytest.approx(expected_flow / 3600)
+    assert call["arguments"]["mass_flow_kg_s"] == pytest.approx(expected_flow / 3600)
+
+
+def test_mixed_heat_duty_still_rejects_a_copied_flow(execution):
+    execution.set_plan(mixed_heat_plan())
+    execute_mixed_streams(execution)
+    with pytest.raises(ValueError, match="不能重抄数值"):
+        execution.execute(
+            "calc_heat_duty",
+            "s3",
+            {
+                "mass_flow_kg_s": 4600 / 3600,
+                "specific_heat_kj_kg_k": 4.18,
+                "delta_t_k": 40,
+            },
+        )
+    assert "s3" not in execution.results
+
+
+@pytest.mark.parametrize("reference", ["s2.mass_fraction", "s1.from_value"])
+def test_mixed_heat_duty_rejects_references_without_flow_units(execution, reference):
+    execution.set_plan(mixed_heat_plan())
+    execute_mixed_streams(execution)
+    with pytest.raises(ValueError, match="缺少可核对的单位"):
+        execution.execute(
+            "calc_heat_duty",
+            "s3",
+            {
+                "mass_flow_kg_s": {"$ref": reference},
+                "specific_heat_kj_kg_k": 4.18,
+                "delta_t_k": 40,
+            },
+        )
+    assert "s3" not in execution.results
+
+
+@pytest.mark.parametrize("unit", ["K", "delta_K", "kg"])
+def test_heat_duty_rejects_an_incompatible_reference_despite_a_flow_dependency(execution, unit):
+    plan = mixed_heat_plan()
+    plan[1]["tool_name"] = "convert_units"
+    execution.set_plan(plan)
+    execution.execute(
+        "convert_units", "s1", {"value": 3600, "from_unit": "kg/h", "to_unit": "kg/s"}
+    )
+    execution.execute("convert_units", "s2", {"value": 1, "from_unit": unit, "to_unit": unit})
+    with pytest.raises(ValueError, match="不兼容"):
+        execution.execute(
+            "calc_heat_duty",
+            "s3",
+            {
+                "mass_flow_kg_s": {"$ref": "s2.value"},
+                "specific_heat_kj_kg_k": 4.18,
+                "delta_t_k": 40,
+            },
+        )
+    assert "s3" not in execution.results
+
+
+def test_mixed_heat_duty_rejects_an_undeclared_result(execution):
+    plan = mixed_heat_plan()
+    plan[2]["depends_on"] = ["s1"]
+    execution.set_plan(plan)
+    execute_mixed_streams(execution)
+    with pytest.raises(ValueError, match="声明为依赖"):
+        execution.execute(
+            "calc_heat_duty",
+            "s3",
+            {
+                "mass_flow_kg_s": {"$ref": "s2.total_flow_kg_h"},
+                "specific_heat_kj_kg_k": 4.18,
+                "delta_t_k": 40,
+            },
+        )
+    assert "s3" not in execution.results

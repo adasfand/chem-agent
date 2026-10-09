@@ -1,0 +1,245 @@
+{
+  "version": "0.3.1",
+  "verified_on": "2026-10-07",
+  "baseline_commit": "699f61b",
+  "scope": "Seven-item contract summary preserved in the source proposal; engineering verification, original scanned contract not obtained",
+  "platform": {
+    "host": "macOS",
+    "python": "3.12.14",
+    "node": "24.19.0",
+    "docker_runtime": "Linux arm64 / Python 3.12.15"
+  },
+  "offline": {
+    "pytest": {
+      "passed": 262,
+      "failed": 0,
+      "warning": "Existing Starlette/AnyIO BlockingPortal deprecation",
+      "skipped": 0,
+      "docker_context_check": "One scratch build regression passed without network; skipped when Docker is unavailable"
+    },
+    "node_state_tests": {
+      "passed": 20,
+      "failed": 0
+    },
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "javascript_syntax": "passed",
+    "git_diff_check": "passed",
+    "uv_sync_locked_offline": "passed"
+  },
+  "integration_smoke": {
+    "status": "passed",
+    "path": "API -> real smolagents loop -> registered retrieval/conversion/heat tools -> Markdown/JSON exports",
+    "model": "scripted offline response only",
+    "heat_duty_kw": 46.44444444444444,
+    "actual_reference": "s2.value",
+    "external_model_calls": 0
+  },
+  "offline_demo": {
+    "status": "passed",
+    "mode": "offline_demo",
+    "fixed_workflow": true,
+    "model_calls": 0,
+    "retrieval": "lexical",
+    "flow_1000_heat_duty_kw": 46.44444444444444,
+    "flow_2000_heat_duty_kw": 92.88888888888889,
+    "json_and_markdown_saved": true
+  },
+  "rag_regressions": {
+    "real_sdk": "LightRAG 1.5.7",
+    "external_calls_or_downloads": 0,
+    "isolated_storage_and_mix_query_mapping": "passed",
+    "cross_directory_cross_root_same_path_rebuild": "passed",
+    "legacy_index_paths_retained": true,
+    "corrupt_vector_graph_detection": "passed",
+    "actual_file_provenance_and_duplicate_ids": "passed",
+    "existing_local_index_offline_check": {
+      "primary": {
+        "state": "ready",
+        "backend": "lightrag",
+        "document_count": 21,
+        "chunk_count": 21
+      },
+      "current_worktree": {
+        "state": "missing",
+        "backend": "lexical",
+        "document_count": 0,
+        "chunk_count": 0
+      },
+      "note": "Primary index retained, ready stores rechecked offline; not included in the new worktree or delivery ZIP"
+    }
+  },
+  "docker": {
+    "build": "passed",
+    "nonroot_uid": 10001,
+    "http_startup_static_health": "passed",
+    "job_without_credentials": "failed record with not_started mode, zero model requests",
+    "idempotent_retry": "same job_id",
+    "markdown_json_exports": "passed, not_started mode and zero model requests",
+    "offline_demo": "46.4444444444 kW",
+    "compose_configuration": "passed",
+    "compose_startup": "passed, isolated test project using verified image",
+    "changed_input_demo": "92.8888888889 kW",
+    "invalid_input_demo": "failed trace and Markdown report; exit 1",
+    "final_image_digest": "sha256:7346ef5eefb91e2e0caf112038e8e0af92e8caf01db1461f1592e5db5436c7e7",
+    "image_note": "Runtime and container inputs verified; later changes were documentation/evidence only",
+    "build_context_boundary": "actual scratch build --network=none; recursive and case-insensitive MD/TXT retained, unsupported attachments and nested private/cache directories excluded"
+  },
+  "live_current": {
+    "status": "passed_core_acceptance_with_quality_findings",
+    "verified_on": "2026-10-07",
+    "tested_code_commit": "877f95db4ff63ef0f40d217cd03f07e8c8a1080b",
+    "model": "deepseek-v4-pro",
+    "minimal_key_verification": {
+      "status": "passed_minimal_smoke",
+      "verified_on": "2026-10-07",
+      "cause_of_prior_configuration_failure": "Configured key-file path referred to a project that had moved; local ignored configuration corrected.",
+      "model": "deepseek-v4-pro",
+      "cases": [
+        {
+          "case": "unit_conversion",
+          "question": "2.5 MPa -> kPa",
+          "status": "completed",
+          "value": 2500.0,
+          "unit": "kPa",
+          "run_id": "20261007T104945-72b1943b77"
+        }
+      ],
+      "model_requests": 4,
+      "successful_model_requests": 4,
+      "trace": "20261007T104945-72b1943b77.json",
+      "report": "live-unit-report.md",
+      "complete_eight_case_suite": "not_rerun",
+      "lightrag_quality_regression": "not_rerun",
+      "credentials_in_delivery": false
+    },
+    "complete_eight_case_suite": "passed_current_lexical",
+    "lightrag_focused_acceptance": "passed_three_current_code_cases_using_matching_retained_index",
+    "lightrag_general_quality_benchmark": "not_run",
+    "cases_passed": 11,
+    "cases_failed": 0,
+    "main_agent_requests": 47,
+    "successful_main_agent_requests": 47,
+    "sdk_keyword_requests_observed": 3,
+    "recovered_guard_errors": 6,
+    "manual_quality_findings": [
+      "Rounded intermediate mass flows are displayed with exact equal signs; actual calculations use full precision.",
+      "Some heat answers omit steady-state or no-reaction assumptions that remain present in tool outputs and evidence.",
+      "Graph descriptions combine multiple sources; each source does not support every clause."
+    ],
+    "summary": "live-regression-summary.json",
+    "evidence": "live-regression-evidence.json",
+    "report": "live-regression-report.md",
+    "credentials_in_delivery": false
+  },
+  "delivery": {
+    "archive": "chem-agent-demo-0.3.1.zip",
+    "independent_source_install": "passed (fresh virtual environment, locked online install with shared package cache; no .env or credentials copied)",
+    "archive_boundaries": "passed",
+    "independent_source_tests": {
+      "passed": 262,
+      "failed": 0,
+      "skipped": 0,
+      "note": "Full final code regression suite rerun from the delivery ZIP in a fresh virtual environment; no pending cases"
+    },
+    "independent_source_doctor_index_demo": "passed",
+    "independent_source_real_http": "passed, actual uvicorn process, health/static resources and not_started Markdown/JSON exports",
+    "wheel_web_assets": "passed",
+    "sdist_knowledge_cards": 21,
+    "independent_frontend_tests": {
+      "passed": 20,
+      "failed": 0
+    },
+    "contract_summary_source_included": true,
+    "verified_code_sha256": {
+      "pyproject.toml": "e4195b109ec18569fd9ed085945a0120a669a893e173c7d9c9be745b48f38bd2",
+      "uv.lock": "0380e04f4327e8fae0412ba5d9ab99eeb42ae3d6990fa85fbe0c9f33ab8d2bee",
+      "Dockerfile": "337a52cacf1c6a37bcc76e6a5b3a17b0217c0ddc10d53c7f72d07bf0a340693b",
+      ".dockerignore": "408a29f927871db7539d4181cfb3a6cdb564c9482d18eab6df5a7a60176aae5b",
+      "compose.yaml": "e8b5c5ac77dd03382a6ff3a46757bce24ba0869e4613d2d6531a9686438511ff",
+      "src/chem_agent/trace.py": "0545acbe804476bc11f4a7964d0e4cd9d50d82438816edcd497002355bee0e6e",
+      "src/chem_agent/execution.py": "ee662b72391da5b0bf5f5738c343f64c5d484a5f7f6fe6ca8542f90e8b91a16a",
+      "src/chem_agent/config.py": "5a208b31c004991aff302a7b0848c2c60f99a21f70047f5b24a7fc5b9cedd215",
+      "src/chem_agent/ui.py": "c45e805abaeaac8b172931f193d9ad05bbc22297fc1dd1c62cb727394fb67d6d",
+      "src/chem_agent/tools.py": "d005ecdbd2361b4d279e6eb7ae36fd20f9a02146a5f84d4b5d42c796da4bbaf1",
+      "src/chem_agent/__init__.py": "9c7a7afac652da77ccf9dd4d8a798173ed8c77793db8a9b8e6f2bc199102a1e3",
+      "src/chem_agent/calculations.py": "e51ad3b5cee53a570c34ea1eb4baae1477d5bffb8d7da21a6dd47a3197f72164",
+      "src/chem_agent/model.py": "5b1587b09cfd64677a75138845284b258621b12cf73c84ee497203cab9f3afdc",
+      "src/chem_agent/cli.py": "f6c5b96a226d9bafc64751fd940a071fbf3a738c8f5b62facabf970db3f3d6c1",
+      "src/chem_agent/retrieval.py": "04c71e63ddc60bbf538f28216ffb4164700d359ff2c28eb098543987e51d7ec8",
+      "src/chem_agent/agent.py": "98f9b6239b76e3df186b28044ca53a41db63054dcd668bf28d194b87670a8442",
+      "src/chem_agent/knowledge.py": "27925528a07e582e8e4894f2260d88c664b6e3642dacfcfb3f2884dea37fcf7a",
+      "src/chem_agent/report.py": "30c5923c96c6763a99323c5dc052ee577764101a902dbd1cf12b95a32f3110d2",
+      "src/chem_agent/web/index.html": "3e06e55754399c3fceee969cca9806e65e40618973c37047e6c34c81f879aff4",
+      "src/chem_agent/web/style.css": "81e5f594efb9e94d821261f43c170941bf54b90502ba54d17276629d242d4ce0",
+      "src/chem_agent/web/app.js": "d21dd572b4fbc6b94fb70897ddb88b19ce43b86f3a608e8696ffa6e449eb7ac1",
+      "tests/test_model.py": "8372853acc56777de661eb714f3e1affd65af969a032861b9766ace3a559b774",
+      "tests/test_execution_review.py": "ad820bdb05c7f6de6294f016d134734b7a9bd82406250e8bd91882f35bd807d5",
+      "tests/test_retrieval.py": "69da0c901605f447262c971e2ef5e6364ac1fabd565f2c5ace98cc88c4e61ede",
+      "tests/test_agent.py": "d10689e4470fc7ab32884a3ded190edfe3c26ed6c05c6519c480eadf05b2adf7",
+      "tests/test_container.py": "27c15d75fc253f1cef25f093f57f4748a6d35af1d96b3db12b7b0e9983521fcf",
+      "tests/test_delivery.py": "686b714f7684f21a2b46446a5e62a3610b3d9efc2e21fb7d6028f4c1f6ccbcae",
+      "tests/test_knowledge.py": "7dcc4bdda16e0dd2637f65b82b947a483412d0c43cba63d2ba675334ba61638e",
+      "tests/test_report.py": "d8fc6f16b54f31a42429906a68ec31eaa3528d6de74e7ffcecfa9b20687c0086",
+      "tests/test_smoke.py": "3a3645d060f92a23882cf4fa72c3a0f844af9198e236b737f532e8baf66ba188",
+      "tests/test_cancellation.py": "a8a03499e0d6e3bf01e70ac09c885036a5f55344bf416e958acaeacb95c062cf",
+      "tests/test_execution.py": "e3e63fddf90a56a76e7532a7695d019823c92ba6ee7e58403ba23b58a2f238ba",
+      "tests/test_calculations.py": "2d45df14f401480e8cbc46fcbc6e17960d697265b89a7eb478ead7de62f799db",
+      "tests/frontend_state.test.cjs": "e170918ea4adae2323b570d9c15147c5db77b4384d8b5d1beb6d5fb4fd2f0e60",
+      "tests/test_ui_api.py": "3c2509a900a19332bd9989f4c08ba195cacb8aef5a7f3519722fc2ad8db10b70",
+      "tests/test_config_trace.py": "54b8f05f4eb7075721806c88f13aabcc36d07d9823d5cd574dcd4f5ba2b1d09d",
+      "tests/test_graph_sources.py": "214638ac06ac8ed40680cc7be2eaa17134ff5c1e1d4cdb0bb83e5264fd8a7662",
+      "scripts/package.py": "6070f9930fcda09eaee5c34f910208a17e21b207c996b1f05e267796f7f9d465",
+      "scripts/demo_offline.py": "4d1eecbd2de2d5db2239c1143dd5ca10e79db6b3f41546faa03c6ec441f6377c",
+      "scripts/validate_live.py": "868911accbbfe54f06f876c2deb3be68702cf932980b73682f1dce2e1d032058",
+      "data/knowledge/21_mit_two_stream_mixing.md": "c11a4e41c53a12ce1790d2096b60780b156b466574828778749fbb36ef13ef03",
+      "data/knowledge/20_nist_water_vapor_heat_capacity.md": "8ee1dcc22377d72b86c90bc620ddc61d3db29521aeee86c4441502b48ad1ee89",
+      "data/knowledge/12_mass_volume.md": "0de46dfeff8f2c6e85927ff2250981d84b9bc789e443dc6c7e3f7d69f74c5269",
+      "data/knowledge/18_iupac_concentration_basis.md": "16cbfdabe3bbee4754848c260089fbd44a167465194c3474efeef49101e24696",
+      "data/knowledge/16_bipm_temperature_interval.md": "59a0eeeb73f77910eb337ba7afa67980d5ba56a4bc35a272189529bd14a73159",
+      "data/knowledge/06_specific_heat.md": "5a3442c4e3df9c024e4cf8f5a0d771c096a825d91072b73a8bf554154cb839b2",
+      "data/knowledge/09_component_balance.md": "c5e58aae71342e58af6b411bf9264f01d61bba6f5d4c44d3296bd50dbc2184ba",
+      "data/knowledge/17_bipm_heat_power_units.md": "fb931bcfdeec8b81de7f60d1f755449d6c29d56c82880f2271b99f91e42b89f2",
+      "data/knowledge/10_mixing_balance.md": "e05bac209210e0af03777b04288db086e36535880677b2084316c7db2ea60ef7",
+      "data/knowledge/11_dilution.md": "87cf55e634158b165a107a32e91568303adbf8e40f542110b759f118179766e5",
+      "data/knowledge/02_heat_assumptions.md": "dc96a686b654d26d039933e55127f26cf12af64be9e4782a8c83d7747a9d31cc",
+      "data/knowledge/19_iupac_heat_capacity_basis.md": "d964ddf388adc10a507b8243c75b4bf8ef7a1d9bfe18c533b8def5846cf3a277",
+      "data/knowledge/01_sensible_heat.md": "8d76ebff0c25b643b16092c8eb9a11061801f2108f1ac52ef83c55a722e2b0c5",
+      "data/knowledge/13_missing_inputs.md": "8979f1ebaafb37188b0de7b230487051a1b248a0ebdd9a0d49976109f665d849",
+      "data/knowledge/15_retrieval_provenance.md": "fb26fcd141eccb4bf09444c0c87a51f2ffda85360693980a8490012debff6617",
+      "data/knowledge/04_temperature_difference.md": "650f05832984ecf8d209c0faafa32a2a9dd4a5605b59b16200cc9abac40d2776",
+      "data/knowledge/03_mass_flow.md": "f8f16cae24127524c9ddb3197fa6706049a819866b26687f955b3cd46b208ff9",
+      "data/knowledge/07_mass_fraction.md": "f6519e4819468f984b4926a2ea1a08bcc02f9019c59398a3871e21a4aad8b221",
+      "data/knowledge/14_result_checks.md": "207a732ea3221c1b4c25965fe78f246a6d7805f16defc60be42de1392b23c611",
+      "data/knowledge/08_total_mass_balance.md": "bcaf22b5df40e10a3d52a3a2aa4cdfcbaa94a3386a7231110be9fd424bd871d3",
+      "data/knowledge/05_units_dimensions.md": "967d9519fb1487c18255177558d42f99a1557d3226e387fc2d3544e60b6b3812",
+      "examples/tasks.json": "e8aa56c726c2d56b6c3f5cd6c3c8199a3712deea198a12bb76be8cc1c854d173"
+    },
+    "final_archive_code_matches_verified_sources": "passed; all runtime, test, script, data, example, dependency and container inputs identical to independently verified source"
+  },
+  "remaining_limits": [
+    "Natural-language parameter attribution and generated explanation numbers require human checks against actual tools.",
+    "Idempotency and UI history expire with memory sessions, restart or history limit.",
+    "No Windows, production multiuser or general retrieval accuracy benchmark.",
+    "LightRAG workspace adaptation is pinned to 1.5.7 and has real SDK offline regressions.",
+    "Original scanned contract has not been obtained; engineering scope uses the preserved seven-item source summary.",
+    "Focused 11-case live acceptance passed; answer rounding/assumption presentation and graph per-claim support granularity still require improvement; no broad live retrieval benchmark."
+  ],
+  "branch": "codex/delivery-hardening",
+  "provenance": "Resumed existing uncommitted 0.3.1 work from the primary directory in an independent worktree; primary code and records preserved",
+  "http_current": {
+    "status": "passed",
+    "knowledge_cards": 21,
+    "failure_mode": "not_started",
+    "model_requests": 0,
+    "idempotency_and_conflict": "passed",
+    "cross_session_access": "denied",
+    "markdown_and_json": "passed"
+  },
+  "current_fix_regressions": {
+    "mixed_stream_heat_references": 13,
+    "endpoint_and_not_started_lifecycle": 15,
+    "actual_docker_build_context": 1,
+    "contract_summary_source_in_archive": "passed"
+  }
+}

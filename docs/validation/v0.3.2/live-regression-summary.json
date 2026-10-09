@@ -1,0 +1,933 @@
+{
+  "version": "0.3.2",
+  "mode": "live",
+  "rounds": [
+    {
+      "label": "before_sentence_and_compound_fix",
+      "created_at": "2026-10-07T14:03:36.631610+00:00",
+      "mode": "live",
+      "model": "deepseek-v4-pro",
+      "tested_code": {
+        "commit": "c2319cc3b1a00d0d39063f9d163f37c1ecc7f267",
+        "dirty": false,
+        "source_sha256": "0a70aaa99b8a5deb9dd9ec1df969e022e0643f612980d2ef776bdd3f5577eb3f",
+        "files": 17
+      },
+      "requested_backend": "lightrag",
+      "index_state": "ready",
+      "knowledge_version": "70991c947a1369d67bc9b593eafd8d0b7fbcf9b136dc40af5b1ff58fde396d68",
+      "status": "finished",
+      "cases": [
+        {
+          "case": "knowledge",
+          "run_id": "20261007T140336-800e7e801c",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 3,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat",
+          "run_id": "20261007T140347-a2a3b29e83",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat_changed_input",
+          "run_id": "20261007T140359-b6e39375b8",
+          "status": "failed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 7,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 13,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": false,
+          "error": "failed"
+        },
+        {
+          "case": "balance",
+          "run_id": "20261007T140433-d67241db3c",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 2,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools_with_explanation",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "units",
+          "run_id": "20261007T140450-007eb506f8",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 1,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "missing_parameter",
+          "run_id": "20261007T140456-62c58ef055",
+          "status": "needs_input",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "follow_up",
+          "run_id": "20261007T140505-864b8c9a5a",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "incompatible_units",
+          "run_id": "20261007T140517-ff4575e026",
+          "status": "needs_input",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 1,
+          "answer_source": "model",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "mixed_heat",
+          "run_id": "20261007T140519-7e4c1bc766",
+          "status": "failed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 7,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 13,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": false,
+          "error": "failed"
+        },
+        {
+          "case": "temperature_explanation",
+          "run_id": "20261007T140558-1f68fbdc38",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 1,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [],
+          "passed": false,
+          "error": "没有成功检索"
+        }
+      ],
+      "passed": false,
+      "recovered_cases": 5,
+      "model_request_count": 60
+    },
+    {
+      "label": "before_user_capacity_fix",
+      "created_at": "2026-10-07T14:11:34.771231+00:00",
+      "mode": "live",
+      "model": "deepseek-v4-pro",
+      "tested_code": {
+        "commit": "14b9e3c5dab02cd3f522eedf40e175bbf116c488",
+        "dirty": false,
+        "source_sha256": "8ff678af849943bc71bf56ba0cebc45f9a90c1c3bbbe01a83bc2d61f1c3b7df9",
+        "files": 17
+      },
+      "requested_backend": "lightrag",
+      "index_state": "ready",
+      "knowledge_version": "70991c947a1369d67bc9b593eafd8d0b7fbcf9b136dc40af5b1ff58fde396d68",
+      "status": "finished",
+      "cases": [
+        {
+          "case": "knowledge",
+          "run_id": "20261007T141134-e206c3a2f5",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 1,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat",
+          "run_id": "20261007T141149-582679d1de",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat_changed_input",
+          "run_id": "20261007T141200-e85d2f04e1",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "balance",
+          "run_id": "20261007T141211-1581f238b9",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "units",
+          "run_id": "20261007T141219-ec3145bfa4",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 1,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "missing_parameter",
+          "run_id": "20261007T141225-cc93ce2c98",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": false,
+          "error": "completed"
+        },
+        {
+          "case": "follow_up",
+          "run_id": "20261007T141240-d3c9976c60",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "incompatible_units",
+          "run_id": "20261007T141252-416f220525",
+          "status": "needs_input",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 1,
+          "answer_source": "model",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "mixed_heat",
+          "run_id": "20261007T141255-e9aa9ca959",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "temperature_explanation",
+          "run_id": "20261007T141306-183098690a",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 2,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 7,
+          "answer_source": "verified_tools_with_explanation",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        }
+      ],
+      "passed": false,
+      "recovered_cases": 7,
+      "model_request_count": 50
+    },
+    {
+      "label": "complete_ten_case_suite",
+      "created_at": "2026-10-07T14:24:02.282259+00:00",
+      "mode": "live",
+      "model": "deepseek-v4-pro",
+      "tested_code": {
+        "commit": "956767dbfdd48da063876c50db59791a215ec632",
+        "dirty": false,
+        "source_sha256": "8bd50e133f31c712fc4d6b7d63cdd89df33baf7c43aa1700dfa8380a58b4c9ed",
+        "files": 18
+      },
+      "requested_backend": "lightrag",
+      "index_state": "ready",
+      "knowledge_version": "70991c947a1369d67bc9b593eafd8d0b7fbcf9b136dc40af5b1ff58fde396d68",
+      "status": "finished",
+      "cases": [
+        {
+          "case": "knowledge",
+          "run_id": "20261007T142402-6a142696b9",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 3,
+          "answer_source": "model",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat",
+          "run_id": "20261007T142411-7342e6e20d",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "heat_changed_input",
+          "run_id": "20261007T142422-caab1b6f1d",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "balance",
+          "run_id": "20261007T142432-da501cf4b0",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "units",
+          "run_id": "20261007T142440-43add58f55",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 1,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 4,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "missing_parameter",
+          "run_id": "20261007T142446-eb5f6e3898",
+          "status": "needs_input",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 1,
+          "answer_source": "model",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "follow_up",
+          "run_id": "20261007T142448-5645346060",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "incompatible_units",
+          "run_id": "20261007T142500-35c497e9e2",
+          "status": "needs_input",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 1,
+          "answer_source": "model",
+          "retrieval_backends": [],
+          "passed": true
+        },
+        {
+          "case": "mixed_heat",
+          "run_id": "20261007T142502-e2b5800807",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        },
+        {
+          "case": "temperature_explanation",
+          "run_id": "20261007T142514-6e22c99d56",
+          "status": "completed",
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 1,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "model_request_count": 6,
+          "answer_source": "verified_tools_with_explanation",
+          "retrieval_backends": [
+            "lightrag"
+          ],
+          "passed": true
+        }
+      ],
+      "passed": true,
+      "recovered_cases": 5,
+      "model_request_count": 43
+    },
+    {
+      "label": "focused_capacity_first_attempt",
+      "created_at": "2026-10-07T14:27:28.233174+00:00",
+      "mode": "live",
+      "tested_code": {
+        "commit": "6b232b471a01d5dc6880c2e17c1bba9f36e0f5c2",
+        "dirty": false,
+        "source_sha256": "21553dd5c477bc2f72dc71a230de4ed59e22facfe98e910494cd868b256250b3",
+        "files": 18
+      },
+      "model": "deepseek-v4-pro",
+      "requested_backend": "lightrag",
+      "cases": [
+        {
+          "case": "withdrawn_capacity",
+          "run_id": "20261007T142728-f813c57fca",
+          "status": "needs_input",
+          "model_request_count": 1,
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "passed": true
+        },
+        {
+          "case": "unknown_capacity_with_example",
+          "run_id": "20261007T142730-f6d56122d7",
+          "status": "failed",
+          "model_request_count": 2,
+          "recovery": {
+            "blocked_tool_batches": 0,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "passed": false,
+          "error": ""
+        },
+        {
+          "case": "updated_capacity",
+          "run_id": "20261007T143259-0aeae40f23",
+          "status": "completed",
+          "model_request_count": 6,
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 0,
+            "failed_final_answers": 0,
+            "recovered": true,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "passed": true
+        }
+      ],
+      "scope": "Focused actual calls for changed heat-capacity guard; not replayed records",
+      "passed": false,
+      "model_request_count": 9
+    },
+    {
+      "label": "focused_capacity_single_retry",
+      "created_at": "2026-10-07T14:34:23.508408+00:00",
+      "mode": "live",
+      "tested_code": {
+        "commit": "6b232b471a01d5dc6880c2e17c1bba9f36e0f5c2",
+        "dirty": true,
+        "source_sha256": "21553dd5c477bc2f72dc71a230de4ed59e22facfe98e910494cd868b256250b3",
+        "files": 18
+      },
+      "model": "deepseek-v4-pro",
+      "requested_backend": "lightrag",
+      "cases": [
+        {
+          "case": "unknown_capacity_with_example",
+          "run_id": "20261007T143423-a4a00c161d",
+          "status": "needs_input",
+          "model_request_count": 6,
+          "recovery": {
+            "blocked_tool_batches": 1,
+            "failed_tool_calls": 1,
+            "failed_final_answers": 0,
+            "recovered": false,
+            "count_source": "tool records and errors observed in subsequent model requests"
+          },
+          "passed": true
+        }
+      ],
+      "scope": "Focused actual calls for changed heat-capacity guard; not replayed records",
+      "passed": true,
+      "model_request_count": 6
+    }
+  ],
+  "latest_accepted_cases": [
+    {
+      "case": "knowledge",
+      "run_id": "20261007T142402-6a142696b9",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 3,
+      "answer_source": "model",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "heat",
+      "run_id": "20261007T142411-7342e6e20d",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 6,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "heat_changed_input",
+      "run_id": "20261007T142422-caab1b6f1d",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 6,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "balance",
+      "run_id": "20261007T142432-da501cf4b0",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 4,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "units",
+      "run_id": "20261007T142440-43add58f55",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 1,
+        "failed_final_answers": 0,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 4,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [],
+      "passed": true
+    },
+    {
+      "case": "missing_parameter",
+      "run_id": "20261007T142446-eb5f6e3898",
+      "status": "needs_input",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 1,
+      "answer_source": "model",
+      "retrieval_backends": [],
+      "passed": true
+    },
+    {
+      "case": "follow_up",
+      "run_id": "20261007T142448-5645346060",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 6,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "incompatible_units",
+      "run_id": "20261007T142500-35c497e9e2",
+      "status": "needs_input",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 1,
+      "answer_source": "model",
+      "retrieval_backends": [],
+      "passed": true
+    },
+    {
+      "case": "mixed_heat",
+      "run_id": "20261007T142502-e2b5800807",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 6,
+      "answer_source": "verified_tools",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "temperature_explanation",
+      "run_id": "20261007T142514-6e22c99d56",
+      "status": "completed",
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 1,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "model_request_count": 6,
+      "answer_source": "verified_tools_with_explanation",
+      "retrieval_backends": [
+        "lightrag"
+      ],
+      "passed": true
+    },
+    {
+      "case": "withdrawn_capacity",
+      "run_id": "20261007T142728-f813c57fca",
+      "status": "needs_input",
+      "model_request_count": 1,
+      "recovery": {
+        "blocked_tool_batches": 0,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "passed": true
+    },
+    {
+      "case": "updated_capacity",
+      "run_id": "20261007T143259-0aeae40f23",
+      "status": "completed",
+      "model_request_count": 6,
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 0,
+        "failed_final_answers": 0,
+        "recovered": true,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "passed": true
+    },
+    {
+      "case": "unknown_capacity_with_example",
+      "run_id": "20261007T143423-a4a00c161d",
+      "status": "needs_input",
+      "model_request_count": 6,
+      "recovery": {
+        "blocked_tool_batches": 1,
+        "failed_tool_calls": 1,
+        "failed_final_answers": 0,
+        "recovered": false,
+        "count_source": "tool records and errors observed in subsequent model requests"
+      },
+      "passed": true
+    }
+  ],
+  "accepted_cases": 13,
+  "accepted_main_agent_requests": 56,
+  "all_recorded_main_agent_requests": 168,
+  "successful_main_agent_requests": 167,
+  "failed_main_agent_requests": 1,
+  "keyword_requests": "SDK-internal requests may use cache; not included or fully instrumented by main_agent_requests",
+  "final_runtime": {
+    "commit": "6b232b471a01d5dc6880c2e17c1bba9f36e0f5c2",
+    "dirty": true,
+    "source_sha256": "21553dd5c477bc2f72dc71a230de4ed59e22facfe98e910494cd868b256250b3",
+    "files": 18
+  },
+  "saved_complete_suite_recheck": {
+    "status": "passed",
+    "mode": "saved_record_recheck",
+    "model_calls": 0,
+    "scope": "Rechecked existing actual traces with current acceptance criteria and final user-capacity guard; not fresh full-suite requests"
+  },
+  "evidence_projection": "Plans, actual tool inputs/outputs/references, sources, final/model answers, request metadata and distinct observed guard errors retained. Repeated model-request histories omitted; private originals remain ignored in runs.",
+  "limits": [
+    "Full ten-case suite tested 956767d; final withdrawal/unknown guard patch 6b232b4 was covered by offline regressions and three focused actual cases.",
+    "The focused retry was dirty only because documentation/screenshots were pending; actual runtime source SHA256 equals the initial focused run.",
+    "One provider request failed before the single-case retry; retained as a failed attempt.",
+    "Explicit capacity declaration matching is narrow; arbitrary prose attribution and per-claim semantic citation support require human review."
+  ]
+}
