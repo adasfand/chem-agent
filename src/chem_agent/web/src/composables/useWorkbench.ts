@@ -1,6 +1,7 @@
 import { computed, shallowReactive } from 'vue'
 import { ApiError, api as defaultApi } from '../services/api'
 import type { Bootstrap, Job, RunSummary, Session, WorkbenchApi } from '../types/api'
+import { conversationChain, groupConversations } from '../utils/conversations'
 
 export type Notice = { message: string; kind: 'error' | 'info' | 'warning' } | null
 
@@ -19,6 +20,7 @@ export function createWorkbench(
   const state = shallowReactive({
     bootstrap: null as Bootstrap | null,
     runs: [] as RunSummary[],
+    jobs: {} as Record<string, Job>,
     job: null as Job | null,
     draft: '',
     booting: false,
@@ -35,6 +37,8 @@ export function createWorkbench(
   let timer: ReturnType<typeof setTimeout> | undefined
   let pendingPoll: { id: string; version: number } | null = null
   let failures = 0
+  let sessionId: string | null = null
+  const historyRequests = new Map<string, Promise<void>>()
   let pendingSubmission: {
     question: string
     requestId: string
@@ -42,6 +46,19 @@ export function createWorkbench(
   } | null = null
 
   const running = computed(() => Boolean(state.job && !state.job.finished))
+  const conversationRuns = computed(() => groupConversations(state.runs, state.jobs))
+  const selectedConversationId = computed(
+    () =>
+      conversationRuns.value.find((run) => run.job_ids.includes(state.job?.job_id ?? ''))?.job_id,
+  )
+  const conversationTurns = computed(() => {
+    if (!state.job) return []
+    const latest = state.jobs[selectedConversationId.value ?? ''] ?? state.job
+    const chain = conversationChain(latest, state.runs, state.jobs)
+    return chain.some((turn) => turn.job_id === state.job?.job_id)
+      ? chain
+      : conversationChain(state.job, state.runs, state.jobs)
+  })
   const busy = computed(() => running.value || state.submitting || state.uncertainSubmission)
   const canSubmit = computed(() =>
     Boolean(
@@ -71,17 +88,65 @@ export function createWorkbench(
       if (state.job.cancel_requested) job = { ...job, cancel_requested: true }
     }
     state.job = job
+    remember(job)
+  }
+
+  function remember(job: Job) {
+    if (state.jobs[job.job_id]?.finished && !job.finished) return
+    state.jobs = { ...state.jobs, [job.job_id]: job }
+  }
+
+  function setSession(session: Session) {
+    if (sessionId !== session.id) state.jobs = {}
+    sessionId = session.id
+    state.runs = session.runs
+    const ids = new Set(session.runs.map((run) => run.job_id))
+    state.jobs = Object.fromEntries(Object.entries(state.jobs).filter(([id]) => ids.has(id)))
+    if (state.job && ids.has(state.job.job_id)) remember(state.job)
+  }
+
+  /** Load existing records only; bounded concurrency and caching avoid model calls. */
+  async function hydrateConversations() {
+    const owner = sessionId
+    const queue = state.runs.filter((run) => !state.jobs[run.job_id])
+    async function worker() {
+      while (queue.length && !disposed && sessionId === owner) {
+        const run = queue.shift()!
+        let request = historyRequests.get(run.job_id)
+        if (!request) {
+          request = api
+            .job(run.job_id)
+            .then((job) => {
+              if (
+                !disposed &&
+                sessionId === owner &&
+                state.runs.some((r) => r.job_id === run.job_id)
+              ) {
+                remember(job)
+              }
+            })
+            .catch(() => {
+              // Keep available rounds usable if an older record expires or fails to load.
+            })
+            .finally(() => historyRequests.delete(run.job_id))
+          historyRequests.set(run.job_id, request)
+        }
+        await request
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker))
   }
 
   async function refreshSession() {
     const version = ++sessionGeneration
     const session = await api.session()
-    if (!disposed && version === sessionGeneration) state.runs = session.runs
+    if (!disposed && version === sessionGeneration) setSession(session)
     return session
   }
 
   function adopt(job: Job, clearDraft = true) {
     state.job = job
+    remember(job)
     if (clearDraft) state.draft = ''
     state.loadingId = null
     state.connected = true
@@ -222,7 +287,7 @@ export function createWorkbench(
   async function submit() {
     if (!canSubmit.value) return
     const question = state.draft.trim()
-    const parent = state.job?.job_id ?? null
+    const parent = conversationTurns.value.at(-1)?.job_id ?? state.job?.job_id ?? null
     const version = ++generation
     stopPoll()
     state.submitting = true
@@ -289,7 +354,7 @@ export function createWorkbench(
       const bootstrap = await api.bootstrap()
       if (!current(version)) return
       state.bootstrap = bootstrap
-      state.runs = bootstrap.session.runs
+      setSession(bootstrap.session)
       state.connected = true
       state.notice = null
       if (state.uncertainSubmission) {
@@ -331,6 +396,21 @@ export function createWorkbench(
     stopPoll()
     visibility?.removeEventListener('visibilitychange', visibilityChanged)
   }
-  return { state, running, busy, canSubmit, boot, submit, cancel, startNew, loadJob, dispose }
+  return {
+    state,
+    running,
+    busy,
+    canSubmit,
+    conversationRuns,
+    conversationTurns,
+    selectedConversationId,
+    hydrateConversations,
+    boot,
+    submit,
+    cancel,
+    startNew,
+    loadJob,
+    dispose,
+  }
 }
 export type Workbench = ReturnType<typeof createWorkbench>

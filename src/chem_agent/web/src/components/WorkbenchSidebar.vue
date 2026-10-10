@@ -9,11 +9,11 @@ import {
   MessageSquare,
   CircleHelp,
 } from '@lucide/vue'
-import type { RunSummary } from '../types/api'
+import type { ConversationSummary } from '../types/api'
 import { timeText, statusLabels } from '../utils/presentation'
 const props = defineProps<{
   view: string
-  runs: RunSummary[]
+  runs: ConversationSummary[]
   selected?: string
   busy: boolean
   loadingId: string | null
@@ -28,7 +28,11 @@ defineEmits<{
 }>()
 const query = ref('')
 const filtered = computed(() =>
-  props.runs.filter((run) => run.question.toLowerCase().includes(query.value.trim().toLowerCase())),
+  props.runs.filter((run) =>
+    `${run.question} ${run.latest_question}`
+      .toLowerCase()
+      .includes(query.value.trim().toLowerCase()),
+  ),
 )
 </script>
 <template>
@@ -64,7 +68,7 @@ const filtered = computed(() =>
     </nav>
     <div class="sidebar-history">
       <div class="nav-caption">
-        最近问答
+        最近对话
         <span>{{ runs.length }}</span>
       </div>
       <label v-if="runs.length" class="history-search">
@@ -82,11 +86,14 @@ const filtered = computed(() =>
           :key="run.job_id"
           :class="{ selected: selected === run.job_id }"
           :aria-current="selected === run.job_id ? 'true' : undefined"
-          :title="run.question"
+          :title="`${run.question}${run.turn_count > 1 ? ` · ${run.turn_count} 轮对话` : ''}`"
           :disabled="(busy && selected !== run.job_id) || loadingId === run.job_id"
           @click="$emit('select', run.job_id)"
         >
           <span class="history-title">{{ run.question }}</span>
+          <span v-if="run.turn_count > 1" class="history-turn-count">
+            {{ run.turn_count }} 轮对话
+          </span>
           <span class="history-meta">
             <i :class="`status-${run.status}`" />
             {{ statusLabels[run.status] }}

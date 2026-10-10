@@ -35,7 +35,7 @@ function shortcut(event: KeyboardEvent) {
         @keydown="shortcut"
       />
       <div class="composer-actions">
-        <span class="composer-mode">{{ job ? '追问：沿用当前任务上下文' : '新问答' }}</span>
+        <span class="composer-mode">{{ job ? '继续当前对话，沿用已有条件' : '新问答' }}</span>
         <span class="input-count">{{ draft.length }} / 4000 字</span>
         <button
           v-if="running"

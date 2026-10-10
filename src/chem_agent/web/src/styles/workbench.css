@@ -367,6 +367,37 @@
   padding: 20px 32px 30px;
   scroll-behavior: smooth;
 }
+.round-caption {
+  max-width: 820px;
+  margin: 0 auto 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.conversation-round + .conversation-round {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.conversation-help,
+.earlier-context {
+  max-width: 820px;
+  margin: 16px auto;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.earlier-context > div {
+  padding: 12px 0;
+}
+.history-turn-count {
+  display: block;
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
 .welcome {
   width: min(100%, 780px);
   margin: auto;

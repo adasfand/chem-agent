@@ -60,6 +60,7 @@ export interface RunResult {
   citations: string[]
   record_warning?: string
   answer_source?: string
+  history?: { role: 'user' | 'assistant'; content: string }[]
 }
 export interface Job {
   job_id: string
@@ -75,6 +76,11 @@ export interface RunSummary {
   created_at: string
   run_id?: string
   client_request_id?: string | null
+}
+export interface ConversationSummary extends RunSummary {
+  job_ids: string[]
+  turn_count: number
+  latest_question: string
 }
 export interface Session {
   id: string

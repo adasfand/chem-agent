@@ -12,6 +12,7 @@ const props = defineProps<{
   loading: boolean
   examples: Example[]
   busy: boolean
+  embedded?: boolean
 }>()
 defineEmits<{ example: [question: string]; knowledge: [] }>()
 const copied = ref(false)
@@ -36,7 +37,7 @@ async function copyAnswer() {
 }
 </script>
 <template>
-  <div class="conversation" :aria-busy="loading">
+  <div :class="embedded ? 'conversation-turn' : 'conversation'" :aria-busy="loading">
     <div v-if="loading" class="empty-message" role="status">正在读取任务记录…</div>
     <div v-else-if="!job" class="welcome">
       <h1>化工问题，从这里开始</h1>

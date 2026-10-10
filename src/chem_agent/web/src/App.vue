@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   Settings2,
   RotateCcw,
@@ -12,11 +12,19 @@ import {
 import { createWorkbench } from './composables/useWorkbench'
 import WorkbenchSidebar from './components/WorkbenchSidebar.vue'
 import TaskComposer from './components/TaskComposer.vue'
-import ResultPanel from './components/ResultPanel.vue'
+import ConversationPanel from './components/ConversationPanel.vue'
 import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import TraceInspector from './components/TraceInspector.vue'
 const workbench = createWorkbench()
-const { state, busy, running, canSubmit } = workbench
+const {
+  state,
+  busy,
+  running,
+  canSubmit,
+  conversationRuns,
+  conversationTurns,
+  selectedConversationId,
+} = workbench
 const view = ref<'workbench' | 'knowledge'>('workbench')
 const knowledgeId = ref<string | null>(null)
 const inspectorOpen = ref(true)
@@ -42,8 +50,15 @@ function openKnowledge(id: string) {
   knowledgeId.value = id
   view.value = 'knowledge'
 }
-onMounted(() => {
-  void workbench.boot()
+watch(
+  () => state.runs,
+  () => {
+    if (!state.booting && state.connected) void workbench.hydrateConversations()
+  },
+)
+onMounted(async () => {
+  await workbench.boot()
+  if (state.connected) void workbench.hydrateConversations()
 })
 onUnmounted(workbench.dispose)
 </script>
@@ -51,8 +66,8 @@ onUnmounted(workbench.dispose)
   <div class="app-shell">
     <WorkbenchSidebar
       :view="view"
-      :runs="state.runs"
-      :selected="state.job?.job_id"
+      :runs="conversationRuns"
+      :selected="selectedConversationId"
       :busy="busy"
       :loading-id="state.loadingId"
       :connected="state.connected"
@@ -124,15 +139,15 @@ onUnmounted(workbench.dispose)
           <X :size="15" />
         </button>
       </div>
-      <label v-if="state.runs.length" class="mobile-history">
+      <label v-if="conversationRuns.length" class="mobile-history">
         最近问答
         <select
-          :value="state.job?.job_id || ''"
+          :value="selectedConversationId || ''"
           :disabled="busy || !!state.loadingId"
           @change="selectJob(($event.target as HTMLSelectElement).value)"
         >
           <option value="" disabled>选择本次会话记录</option>
-          <option v-for="run in state.runs" :key="run.job_id" :value="run.job_id">
+          <option v-for="run in conversationRuns" :key="run.job_id" :value="run.job_id">
             {{ run.question }}
           </option>
         </select>
@@ -145,7 +160,7 @@ onUnmounted(workbench.dispose)
         <section class="conversation-column" aria-label="化工问答">
           <div class="conversation-heading">
             <div>
-              <h2>{{ state.job ? '任务详情' : '化工知识与计算' }}</h2>
+              <h2>{{ state.job ? '当前对话' : '化工知识与计算' }}</h2>
               <p>
                 {{
                   state.job
@@ -159,13 +174,15 @@ onUnmounted(workbench.dispose)
               知识库
             </button>
           </div>
-          <ResultPanel
+          <ConversationPanel
             :job="state.job"
+            :turns="conversationTurns"
             :loading="!!state.loadingId"
             :examples="state.bootstrap?.examples ?? []"
             :busy="busy"
             @example="newTask"
             @knowledge="view = 'knowledge'"
+            @inspect="selectJob"
           />
           <TaskComposer
             v-model:draft="state.draft"
@@ -175,7 +192,7 @@ onUnmounted(workbench.dispose)
             :connected="state.connected"
             :can-submit="canSubmit"
             :cancelling="state.cancelling"
-            :job="state.job"
+            :job="conversationTurns.at(-1) ?? state.job"
             @submit="workbench.submit()"
             @cancel="workbench.cancel()"
           />

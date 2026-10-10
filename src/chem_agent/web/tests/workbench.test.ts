@@ -98,6 +98,49 @@ afterEach(() => {
 })
 
 describe('workbench task lifecycle', () => {
+  it('continues the latest round even when inspecting an older round of that conversation', async () => {
+    const api = mockApi()
+    const parent = job('parent', true)
+    const child = job('child', true, '补充比热3.6')
+    child.result.parent_run_id = parent.result.run_id
+    api.bootstrap.mockResolvedValue(bootstrap(session(child, parent)))
+    api.job.mockImplementation(async (id) => (id === 'parent' ? parent : child))
+    api.session.mockResolvedValue(session(child, parent))
+    api.submit.mockResolvedValue(job('next'))
+    const workbench = controller(api)
+    await workbench.boot()
+    await workbench.hydrateConversations()
+    await workbench.loadJob('parent')
+    expect(workbench.conversationRuns.value).toHaveLength(1)
+    expect(workbench.conversationTurns.value.map((round) => round.job_id)).toEqual([
+      'parent',
+      'child',
+    ])
+    workbench.state.draft = '流量修改为3600 kg/h'
+    await workbench.submit()
+    expect(api.submit).toHaveBeenCalledWith('流量修改为3600 kg/h', 'child', expect.any(String))
+  })
+
+  it('restores grouped rounds after refresh and never adds context to a new conversation', async () => {
+    const api = mockApi()
+    const parent = job('parent', true)
+    const child = job('child', true)
+    child.result.parent_run_id = parent.result.run_id
+    api.bootstrap.mockResolvedValue(bootstrap(session(child, parent)))
+    api.job.mockImplementation(async (id) => (id === 'parent' ? parent : child))
+    api.submit.mockResolvedValue(job('new'))
+    const workbench = controller(api)
+    await workbench.boot()
+    await workbench.hydrateConversations()
+    expect(workbench.conversationRuns.value).toHaveLength(1)
+    const reads = api.job.mock.calls.length
+    await workbench.hydrateConversations()
+    expect(api.job.mock.calls).toHaveLength(reads)
+    workbench.startNew('独立问题')
+    await workbench.submit()
+    expect(api.submit).toHaveBeenCalledWith('独立问题', null, expect.any(String))
+  })
+
   it('allows browsing without credentials while preventing model submission', async () => {
     const api = mockApi()
     api.bootstrap.mockResolvedValue(bootstrap(session(), false))
