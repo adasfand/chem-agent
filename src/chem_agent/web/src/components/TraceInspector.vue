@@ -1,28 +1,24 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { GitBranch, Wrench, BookOpen, ScanText, Search as SearchIcon } from '@lucide/vue'
 import type { Bootstrap, Job } from '../types/api'
-import ExecutionTrace from './ExecutionTrace.vue'
+import ExecutionAudit from './ExecutionAudit.vue'
+import ToolRegistryDialog from './ToolRegistryDialog.vue'
 import EvidencePanel from './EvidencePanel.vue'
 import RetrievalPath from './RetrievalPath.vue'
-const props = defineProps<{
+defineProps<{
   job: Job | null
   indexStatus?: Bootstrap['index_status']
   knowledgeCount: number
 }>()
 defineEmits<{ knowledge: [id: string] }>()
-const tab = ref('path')
+const registryDialog = ref<InstanceType<typeof ToolRegistryDialog>>()
+const tab = ref('audit')
 const tabs = [
   { id: 'path', label: '检索路径', icon: GitBranch },
-  { id: 'tools', label: '工具调用', icon: Wrench },
+  { id: 'audit', label: '执行审计', icon: Wrench },
   { id: 'sources', label: '引用依据', icon: BookOpen },
 ]
-watch(
-  () => props.job?.job_id,
-  () => {
-    tab.value = 'path'
-  },
-)
 function key(event: KeyboardEvent, index: number) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
@@ -41,6 +37,10 @@ function key(event: KeyboardEvent, index: number) {
     <div class="inspector-heading">
       <ScanText :size="17" />
       <h2>依据与过程</h2>
+      <button class="inspector-registry-button" @click="registryDialog?.open()">
+        <Wrench :size="13" />
+        工具注册表
+      </button>
     </div>
     <div class="inspector-tabs" role="tablist" aria-label="追溯视图">
       <button
@@ -96,7 +96,7 @@ function key(event: KeyboardEvent, index: number) {
         </div>
       </template>
       <RetrievalPath v-else-if="tab === 'path'" :result="job.result" />
-      <ExecutionTrace v-else-if="tab === 'tools'" :result="job.result" />
+      <ExecutionAudit v-else-if="tab === 'audit'" :result="job.result" />
       <EvidencePanel
         v-else
         :evidence="job.result.evidence"
@@ -120,5 +120,6 @@ function key(event: KeyboardEvent, index: number) {
       </div>
       <p>{{ indexStatus?.message || '连接后端后读取知识索引状态。' }}</p>
     </div>
+    <ToolRegistryDialog ref="registryDialog" />
   </aside>
 </template>

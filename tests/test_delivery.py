@@ -62,16 +62,19 @@ def test_package_excludes_private_nested_files_and_cache(tmp_path, monkeypatch):
     (tmp_path / "src" / "linked.txt").symlink_to(outside)
     monkeypatch.setattr(package, "ROOT", tmp_path)
     package.main()
-    with zipfile.ZipFile(tmp_path / "dist" / "chem-agent-demo-test.zip") as archive:
+    with zipfile.ZipFile(tmp_path / "dist" / f"{tmp_path.name}.zip") as archive:
         names = set(archive.namelist())
-    assert "chem-agent-demo/src/public.py" in names
-    assert "chem-agent-demo/.env.example" in names
-    assert "chem-agent-demo/Dockerfile" in names
-    assert "chem-agent-demo/compose.yaml" in names
-    assert "chem-agent-demo/.dockerignore" in names
-    assert "chem-agent-demo/化工知识增强与工具调用_代码交付初步方案.md" in names
+    assert f"{tmp_path.name}/src/public.py" in names
+    assert f"{tmp_path.name}/.env.example" in names
+    assert f"{tmp_path.name}/Dockerfile" in names
+    assert f"{tmp_path.name}/compose.yaml" in names
+    assert f"{tmp_path.name}/.dockerignore" in names
+    assert f"{tmp_path.name}/化工知识增强与工具调用_代码交付初步方案.md" in names
     assert not any(
-        "private" in name or "linked" in name or ".env.production" in name for name in names
+        "private" in name.split("/", 1)[1]
+        or "linked" in name.split("/", 1)[1]
+        or ".env.production" in name
+        for name in names
     )
 
 
@@ -88,10 +91,10 @@ def test_package_excludes_symlinked_allowlist_roots(tmp_path, monkeypatch, direc
     (project / "src" / "public.py").write_text("example")
     monkeypatch.setattr(package, "ROOT", project)
     package.main()
-    with zipfile.ZipFile(project / "dist" / "chem-agent-demo-test.zip") as archive:
+    with zipfile.ZipFile(project / "dist" / f"{project.name}.zip") as archive:
         names = set(archive.namelist())
-    assert "chem-agent-demo/src/public.py" in names
-    assert not any(name.startswith(f"chem-agent-demo/{directory}/") for name in names)
+    assert f"{project.name}/src/public.py" in names
+    assert not any(name.startswith(f"{project.name}/{directory}/") for name in names)
     assert not any("private" in name for name in names)
 
 

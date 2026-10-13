@@ -1871,3 +1871,24 @@ summary {
     margin-right: 15px;
   }
 }
+
+.knowledge-index-status {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 14px 18px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.knowledge-index-status strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.library-content-search {
+  margin: 0 16px 8px;
+}

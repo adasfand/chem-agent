@@ -1,6 +1,68 @@
 import { describe, expect, it } from 'vitest'
-import { graphLayout, retrievalFor, sourceIds, safeUrl } from '../src/utils/retrieval'
+import {
+  defaultEntityIndex,
+  graphLayout,
+  retrievalFor,
+  sourceIds,
+  safeUrl,
+} from '../src/utils/retrieval'
 describe('retrieval provenance', () => {
+  it('focuses a cited hit entity over an unrelated node with more connections', () => {
+    const entities = [
+      { id: 'separator', name: '稳态无反应分离器', source_ids: ['unselected'] },
+      { id: 'energy', name: '稳态能量守恒', source_ids: ['heat-hit'] },
+      { id: 'fraction', name: '质量分数', source_ids: ['mix-hit'] },
+      { id: 'heat', name: '简化热负荷', source_ids: [] },
+    ]
+    const relationships = [
+      { source: 'separator', target: 'energy' },
+      { source: 'separator', target: 'fraction' },
+      { source: 'separator', target: 'heat' },
+    ]
+    const before = graphLayout(entities, relationships)
+    expect(
+      defaultEntityIndex(
+        entities,
+        relationships,
+        [{ chunk_id: 'heat-hit' }, { chunk_id: 'mix-hit' }],
+        ['heat-hit'],
+        ['能量守恒'],
+      ),
+    ).toBe(1)
+    expect(graphLayout(entities, relationships)).toEqual(before)
+  })
+  it('prefers visible real connections and does not treat unrelated graph sources as query hits', () => {
+    const entities = [
+      { id: 'unlinked', name: '知识孤点', source_ids: ['hit'] },
+      { id: 'A', name: '质量分数', source_ids: ['graph-only'] },
+      { id: 'B', name: '稳态能量守恒', source_ids: [] },
+    ]
+    const relationships = [{ source: 'A', target: 'B' }]
+    expect(
+      defaultEntityIndex(
+        entities,
+        relationships,
+        [{ chunk_id: 'hit' }],
+        ['hit', 'graph-only'],
+        ['能量守恒'],
+      ),
+    ).toBe(2)
+    expect(defaultEntityIndex(entities, [], [{ chunk_id: 'hit' }], ['hit'])).toBe(0)
+  })
+  it('uses actual keywords and deterministic tie breaking when no source overlap exists', () => {
+    const entities = [
+      { id: 'a', name: '分离器' },
+      { id: 'b', name: '质量分数' },
+    ]
+    const relationships = [
+      { source: 'a', target: 'b' },
+      { source: 'a', target: 'missing' },
+    ]
+    expect(defaultEntityIndex(entities, relationships, [], [], ['质量分数'])).toBe(1)
+    expect(defaultEntityIndex(entities, relationships, [], [], [], '请检索质量分数定义')).toBe(1)
+    expect(defaultEntityIndex(entities, relationships, [])).toBe(0)
+    expect(defaultEntityIndex([], [], [])).toBe(0)
+  })
   it('does not promote graph-associated sources to query hits or invent scores', () => {
     const value = retrievalFor({
       call_id: 'c1',

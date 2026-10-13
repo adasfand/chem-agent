@@ -39,6 +39,7 @@ const connection = computed(() =>
         : '模型待配置',
 )
 function newTask(question = '') {
+  if (busy.value) return
   workbench.startNew(question)
   view.value = 'workbench'
 }
@@ -82,7 +83,9 @@ onUnmounted(workbench.dispose)
         <div class="breadcrumbs">
           工作空间
           <span>/</span>
-          <strong>{{ view === 'workbench' ? '问答工作台' : '知识资料库' }}</strong>
+          <strong>
+            {{ view === 'workbench' ? '问答工作台' : '知识资料库' }}
+          </strong>
         </div>
         <div class="topbar-actions">
           <button
@@ -214,7 +217,17 @@ onUnmounted(workbench.dispose)
           </div>
           <button class="button secondary" @click="view = 'workbench'">返回问答</button>
         </div>
-        <KnowledgeLibrary :items="state.bootstrap?.knowledge ?? []" :initial-id="knowledgeId" />
+        <KnowledgeLibrary
+          :items="state.bootstrap?.knowledge ?? []"
+          :initial-id="knowledgeId"
+          :index-status="state.bootstrap?.index_status"
+          :busy="busy"
+          @search="
+            newTask(
+              `请检索知识库中关于${$event}的内容，说明相关定义、公式及适用条件，并引用检索到的知识来源。`,
+            )
+          "
+        />
       </div>
     </main>
     <dialog

@@ -1,4 +1,13 @@
-import type { Bootstrap, Job, KnowledgeDetail, Session, WorkbenchApi } from '../types/api'
+import type {
+  Bootstrap,
+  Job,
+  KnowledgeDetail,
+  Session,
+  WorkbenchApi,
+  ToolRegistry,
+  ManualToolResult,
+  JsonValue,
+} from '../types/api'
 import { createKnowledgeCache } from './knowledgeCache'
 
 export class ApiError extends Error {
@@ -76,4 +85,13 @@ export const api: WorkbenchApi = {
 }
 export function exportUrl(id: string, format: 'report.md' | 'trace.json'): string {
   return `/api/jobs/${encodeURIComponent(id)}/${format}`
+}
+export const toolRegistryApi = {
+  list: (refresh = false) =>
+    request<ToolRegistry>(`/api/tool-registry${refresh ? '?refresh=true' : ''}`),
+  invoke: (name: string, args: Record<string, JsonValue>) =>
+    request<ManualToolResult>(`/api/tool-registry/${encodeURIComponent(name)}/invoke`, {
+      method: 'POST',
+      body: JSON.stringify({ arguments: args }),
+    }),
 }

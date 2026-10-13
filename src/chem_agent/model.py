@@ -97,6 +97,7 @@ class TracedModel(OpenAIModel):
             status="succeeded",
             finished_at=utc_now(),
             latency_ms=round((perf_counter() - started) * 1000, 3),
+            selected_tools=[call.function.name for call in (response.tool_calls or [])],
         )
         usage = response.token_usage
         entry["usage"] = (

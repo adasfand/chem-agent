@@ -328,6 +328,15 @@ def test_compound_temperature_case_requires_and_accepts_preserved_explanation(te
     validation.temperature_explanation_check(temperature_result)
 
 
+@pytest.mark.parametrize("negative", ["不再加", "不应添加", "不需要", "无需", "不叠加", "不引入"])
+def test_temperature_check_recognizes_equivalent_offset_explanations(temperature_result, negative):
+    temperature_result["answer"] = (
+        "25 degC → 298.15 K。\n补充说明：绝对温度有温标原点偏移；"
+        f"温差由两个温度相减得到，偏移量抵消，温差换算{negative}偏移量。"
+    )
+    validation.temperature_explanation_check(temperature_result)
+
+
 @pytest.mark.parametrize(
     "explanation",
     ["", "补充说明：绝对温度与温差不同。", "补充说明：绝对温度需要偏移，温差不添加偏移。"],

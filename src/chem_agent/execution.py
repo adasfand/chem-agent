@@ -37,10 +37,13 @@ class Execution:
         knowledge: KnowledgeBase,
         trace: RunTrace,
         trusted_user_inputs: list[str] | None = None,
+        *,
+        require_retrieval: bool = False,
     ):
         self.knowledge = knowledge
         self.trace = trace
         self.trusted_user_inputs = trusted_user_inputs
+        self.require_retrieval = require_retrieval
         self.requires_explanation = requires_concept_explanation(trace.data["question"])
         self.results: dict[str, dict] = {}
         self.functions = {
@@ -58,6 +61,18 @@ class Execution:
         if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
             raise ValueError("计划需要包含 1–6 个步骤。")
         parsed = [PlanStep.model_validate(step) for step in steps]
+        if self.require_retrieval:
+            ancestors: dict[str, set[str]] = {}
+            searches = {step.step_id for step in parsed if step.tool_name == "search_knowledge"}
+            for step in parsed:
+                dependencies = set(step.depends_on)
+                for dependency in step.depends_on:
+                    dependencies.update(ancestors.get(dependency, set()))
+                ancestors[step.step_id] = dependencies
+                if step.tool_name in {"calc_heat_duty", "calc_mass_balance"} and not (
+                    dependencies & searches
+                ):
+                    raise ValueError("计算计划需要先检索公式与适用条件，并依赖该检索步骤。")
         if (
             self.requires_explanation
             and any(step.tool_name != "search_knowledge" for step in parsed)

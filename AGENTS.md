@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`src/chem_agent/` contains configuration, knowledge retrieval, deterministic calculations, validated execution, model integration, CLI, FastAPI service, and a static frontend in `web/`. Keep numerical functions independent of model calls. `data/knowledge/` contains 15 original Chinese teaching cards; `examples/tasks.json` defines demonstration inputs. `tests/` contains offline regression tests. `docs/` holds the technical report and verified sample traces. Generated private records belong in ignored `runs/`; delivery archives belong in `dist/`.
+`src/chem_agent/` contains configuration, knowledge retrieval, deterministic calculations, validated execution, model integration, CLI, FastAPI service, and the independent Vue/TypeScript frontend in `web/`. Keep numerical functions independent of model calls. `data/knowledge/` contains 71 teaching and official-source knowledge cards; `examples/tasks.json` defines demonstration inputs. `tests/` contains offline regression tests. `docs/` holds the research report and verified workflow evidence. Generated private records belong in ignored `runs/`; delivery archives belong in `dist/`.
 
 Root planning reports describe proposals; consult `README.md` and code for implemented behavior.
 
@@ -27,6 +27,8 @@ Use Python 3.11–3.13, four-space indentation, explicit input/output types, `sn
 ## Testing Guidelines
 
 Use pytest and `tests/test_*.py`. Cover reference calculations, incompatible units, missing inputs, retrieval provenance, actual result references, model failure, cancellation, report export, and session isolation. Default tests must work without credentials or model requests. No numeric coverage threshold is imposed. Distinguish offline checks, actual live calls, and replayed records.
+
+For local browser checks, first reuse the user's running backend at `http://127.0.0.1:7860` and Vue frontend at `http://127.0.0.1:5173`. Preserve user-owned service processes; a separate service requires current user authorization. Use one or two representative billable examples to demonstrate the actual workbench flow. Show functional evidence through retrieval paths, execution plans, tool parameters/results, result references and citations.
 
 ## Commit & Pull Request Guidelines
 

@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from chem_agent import __version__
 from chem_agent.agent import run_task
 from chem_agent.config import Settings
+from chem_agent.observability import context_evidence
 from chem_agent.retrieval import HybridRetriever
 from chem_agent.trace import RunTrace, redact, utc_now
 
@@ -136,6 +137,19 @@ class _Runtime:
             return value
 
         cleaned = remove_private(cleaned)
+        if "model_requests" in cleaned:
+            cleaned["context_evidence"] = context_evidence(cleaned)
+        # Publish observable provider events, never request messages or private reasoning.
+        event_fields = {"requested_at", "finished_at", "status", "latency_ms", "selected_tools"}
+        if "model_requests" in cleaned:
+            cleaned["model_events"] = []
+            for entry in cleaned["model_requests"]:
+                event = {key: entry[key] for key in event_fields if key in entry}
+                usage = entry.get("usage") or {}
+                event["usage"] = {
+                    key: usage[key] for key in ("input_tokens", "output_tokens") if key in usage
+                }
+                cleaned["model_events"].append(event)
         if include_requests:
             allowed = {"model", "base_url", "request_timeout", "max_steps"}
             cleaned["config"] = {
@@ -393,6 +407,9 @@ def create_app(settings: Settings) -> FastAPI:
     allowed_hosts.add(configured_host)
     app = FastAPI(title="化工知识与计算助手", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.runtime = runtime
+    from chem_agent.mcp_registry import ToolRegistry
+
+    registry = ToolRegistry(settings.root)
     examples = json.loads((settings.root / "examples" / "tasks.json").read_text(encoding="utf-8"))
     inventory = runtime.knowledge.inventory()
     by_id = {item["doc_id"]: item for item in inventory}
@@ -528,6 +545,35 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/api/session")
     def session_info(request: Request):
         return runtime.session_view(request.state.chem_session)
+
+    @app.get("/api/tool-registry")
+    async def tool_registry(refresh: bool = False):
+        return await registry.describe(refresh=refresh)
+
+    @app.post("/api/tool-registry/{name}/invoke")
+    async def invoke_registered_tool(name: str, request: Request):
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 16_384:
+                raise HTTPException(413, "工具参数超过大小限制。")
+        try:
+            payload = json.loads(body)
+        except (ValueError, UnicodeError):
+            raise HTTPException(422, "工具参数需要使用 JSON 对象。") from None
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"arguments"}
+            or not isinstance(payload["arguments"], dict)
+        ):
+            raise HTTPException(422, "请提供 arguments 参数对象。")
+        try:
+            result = await registry.invoke(name, payload["arguments"])
+        except KeyError:
+            raise HTTPException(404, "此工具未注册或不支持手动调用。") from None
+        except RuntimeError:
+            raise HTTPException(503, "MCP 工具服务未连接，请确认依赖已安装后重试。") from None
+        return redact(result, runtime.secrets)
 
     @app.post("/api/jobs", status_code=202)
     def new_job(payload: JobInput, request: Request):

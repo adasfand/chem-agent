@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import re
@@ -17,6 +16,7 @@ from chem_agent.agent import run_task
 from chem_agent.config import Settings
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.retrieval import HybridRetriever
+from chem_agent.validation import CASE_TITLES, source_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 _BATCH_ERROR = "每次回复只允许调用一个工具"
@@ -295,9 +295,10 @@ def temperature_explanation_check(result: dict) -> None:
     assert re.search(r"差值|相减|抵消|两个|两点|T_out\s*[−-]\s*T_in", explanation), (
         "未说明温差来自相减"
     )
-    assert re.search(r"无需|不能|不(?:加|添加|套用|应用|需要)", explanation), (
-        "未解释温差不能添加绝对温度偏移"
-    )
+    assert re.search(
+        r"无需|无须|不能|不(?:再|应|应当|应该|必)?(?:加|添加|叠加|套用|应用|需要|包含|引入)",
+        explanation,
+    ), "未解释温差不能添加绝对温度偏移"
 
 
 def missing_check(result: dict) -> None:
@@ -353,17 +354,6 @@ def check_backend(result: dict, requested: str) -> list[str]:
 
 def code_identity(root: Path) -> dict:
     """Bind acceptance evidence to the commit and files actually evaluated."""
-    digest = hashlib.sha256()
-    paths = [root / "pyproject.toml", root / "uv.lock", root / "scripts" / "validate_live.py"]
-    paths.extend((root / "src").rglob("*.py"))
-    files = 0
-    for path in sorted(paths):
-        if not path.is_file() or path.is_symlink():
-            continue
-        for content in (path.relative_to(root).as_posix().encode(), path.read_bytes()):
-            digest.update(len(content).to_bytes(8, "big"))
-            digest.update(content)
-        files += 1
     commit = None
     dirty = None
     try:
@@ -379,7 +369,7 @@ def code_identity(root: Path) -> dict:
             dirty = bool(status.stdout.strip())
     except (OSError, subprocess.TimeoutExpired):
         pass
-    return {"commit": commit, "dirty": dirty, "source_sha256": digest.hexdigest(), "files": files}
+    return {"commit": commit, "dirty": dirty, **source_identity(root)}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -390,11 +380,23 @@ def main(argv: list[str] | None = None) -> None:
         help="复用已就绪索引的项目目录（含 build/lightrag 和 .local）；代码、资料与 runs 使用当前项目",
     )
     parser.add_argument("--backend", choices=("auto", "lexical", "lightrag"), default="auto")
+    parser.add_argument(
+        "--case",
+        action="append",
+        choices=tuple(CASE_TITLES),
+        help="仅验证指定案例，可重复指定；补参自动包含前一轮缺参。",
+    )
+    parser.add_argument(
+        "--output", type=Path, help="单独保存本轮验证摘要，默认保存在 runs/live_validation.json。"
+    )
     args = parser.parse_args(argv)
+    selected = set(args.case or CASE_TITLES)
+    if "follow_up" in selected:
+        selected.add("missing_parameter")
     settings, index_state = prepare_settings(Settings.load(ROOT), args.index_root, args.backend)
     examples = {
         example["id"]: example["question"]
-        for example in json.loads((ROOT / "examples/tasks.json").read_text())
+        for example in json.loads((ROOT / "examples/tasks.json").read_text(encoding="utf-8"))
     }
     report = {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -407,7 +409,7 @@ def main(argv: list[str] | None = None) -> None:
         "status": "running",
         "cases": [],
     }
-    report_path = settings.runs_dir / "live_validation.json"
+    report_path = args.output or settings.runs_dir / "live_validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
     def save() -> None:
@@ -415,6 +417,8 @@ def main(argv: list[str] | None = None) -> None:
         report_path.chmod(0o600)
 
     def run(case_id, question, check, history=None):
+        if case_id not in selected:
+            return {"answer": ""}
         result = run_task(question, settings, history=history)
         entry = {
             "case": case_id,

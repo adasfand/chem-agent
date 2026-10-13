@@ -30,12 +30,8 @@ watch(
   () => props.result.run_id,
   () => {
     queryIndex.value = 0
-    selected.value = 0
   },
 )
-watch(queryIndex, () => {
-  selected.value = 0
-})
 </script>
 <template>
   <div class="retrieval-path">
@@ -43,7 +39,7 @@ watch(queryIndex, () => {
       {{
         result.status === 'running'
           ? '完成知识检索后，在这里查看本轮查询、实体关系和命中片段。'
-          : '本次任务没有成功的知识检索记录，可在“工具调用”中查看执行过程。'
+          : '本次任务没有成功的知识检索记录，可在“执行审计”中查看执行过程。'
       }}
     </p>
     <label v-if="queries.length > 1" class="query-select">
@@ -91,6 +87,10 @@ watch(queryIndex, () => {
           :relationships="query.relationships"
           :sources="query.sources"
           :hits="query.hits"
+          :citations="result.citations"
+          :keywords="query.keywords"
+          :query="query.query"
+          :selection-key="`${result.run_id || result.started_at}:${queryIndex}`"
         />
         <div v-if="entity" class="entity-detail">
           <h4>

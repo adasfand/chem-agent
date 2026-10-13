@@ -1,7 +1,6 @@
 """Create a source delivery archive from an explicit allowlist."""
 
 import hashlib
-import tomllib
 import zipfile
 from pathlib import Path
 
@@ -46,8 +45,7 @@ EXCLUDED_PARTS = {
 
 
 def main():
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-    output = ROOT / "dist" / f"chem-agent-demo-{version}.zip"
+    output = ROOT / "dist" / f"{ROOT.name}.zip"
     output.parent.mkdir(exist_ok=True)
     resolved_root = ROOT.resolve()
     included = []
@@ -74,7 +72,7 @@ def main():
                 continue
             if path.suffix in {".pyc", ".tmp"}:
                 continue
-            archive.write(path, str(Path("chem-agent-demo") / relative))
+            archive.write(path, str(Path(ROOT.name) / relative))
             included.append(str(relative))
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     output.with_suffix(".zip.sha256").write_text(f"{digest}  {output.name}\n", encoding="utf-8")

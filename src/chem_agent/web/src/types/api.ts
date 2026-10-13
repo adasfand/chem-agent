@@ -15,6 +15,9 @@ export interface ToolCall {
   step_id: string
   tool_name: string
   status: StepStatus
+  started_at?: string
+  finished_at?: string
+  latency_ms?: number
   arguments?: Record<string, JsonValue> | null
   requested_arguments?: Record<string, JsonValue>
   input_refs?: {
@@ -28,6 +31,44 @@ export interface ToolCall {
   output?: Record<string, JsonValue>
   error?: JsonValue
   input_provenance?: Record<string, JsonValue>[]
+}
+export interface ModelEvent {
+  requested_at?: string
+  finished_at?: string
+  status?: 'pending' | 'succeeded' | 'failed'
+  latency_ms?: number
+  selected_tools?: string[]
+  usage?: { input_tokens?: number; output_tokens?: number }
+}
+export interface RegisteredTool {
+  name: string
+  title: string
+  description: string
+  source: 'agent' | 'mcp'
+  invocation: 'model' | 'manual'
+  input_schema?: Record<string, JsonValue>
+  output_schema?: Record<string, JsonValue> | null
+  example?: Record<string, JsonValue>
+}
+export interface ToolRegistry {
+  state: 'connected' | 'unavailable'
+  server: string
+  transport: string
+  checked_at: string
+  message?: string
+  tools: RegisteredTool[]
+}
+export interface ManualToolResult {
+  tool_name: string
+  source: 'manual'
+  server: string
+  status: 'succeeded' | 'failed'
+  started_at: string
+  finished_at: string
+  latency_ms: number
+  arguments: Record<string, JsonValue>
+  output: JsonValue
+  error: string | null
 }
 export interface KnowledgeItem {
   doc_id: string
@@ -54,6 +95,10 @@ export interface RunResult {
   answer: string
   started_at: string
   finished_at?: string
+  latency_ms?: number
+  mode?: string
+  model_events?: ModelEvent[]
+  context_evidence?: { chunk_id: string; title: string; request_indices: number[] }[]
   plan: PlanStep[]
   calls: ToolCall[]
   evidence: Evidence[]

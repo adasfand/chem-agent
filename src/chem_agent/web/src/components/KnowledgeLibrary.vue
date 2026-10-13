@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { Search, BookOpen, ChevronRight, FileText } from '@lucide/vue'
-import type { KnowledgeDetail, KnowledgeItem } from '../types/api'
+import type { Bootstrap, KnowledgeDetail, KnowledgeItem } from '../types/api'
 import { api } from '../services/api'
 import MarkdownText from './MarkdownText.vue'
-const props = defineProps<{ items: KnowledgeItem[]; initialId: string | null }>()
+const props = defineProps<{
+  items: KnowledgeItem[]
+  initialId: string | null
+  indexStatus?: Bootstrap['index_status']
+  busy?: boolean
+}>()
+defineEmits<{ search: [query: string] }>()
 const query = ref('')
 const selected = ref('')
 const detail = ref<KnowledgeDetail | null>(null)
@@ -58,6 +64,16 @@ onUnmounted(() => {
 </script>
 <template>
   <div class="knowledge-layout">
+    <section class="knowledge-index-status" aria-label="知识处理与索引状态">
+      <strong>知识处理与检索索引</strong>
+      <span>资料文档 {{ items.length }}</span>
+      <span>正文解析片段 {{ items.reduce((sum, item) => sum + item.chunk_count, 0) }}</span>
+      <span v-if="indexStatus?.backend === 'lightrag' && indexStatus.state === 'ready'">
+        LightRAG 索引片段 {{ indexStatus.chunk_count }}
+      </span>
+      <span>检索后端 {{ indexStatus?.backend ?? '未记录' }}</span>
+      <span>索引状态 {{ indexStatus?.message ?? '等待后端状态' }}</span>
+    </section>
     <section class="knowledge-index panel">
       <div class="panel-heading">
         <BookOpen :size="19" />
@@ -69,10 +85,21 @@ onUnmounted(() => {
         <input
           v-model="query"
           type="search"
-          aria-label="搜索知识卡"
-          placeholder="搜索标题或来源…"
+          maxlength="160"
+          aria-label="筛选目录标题或来源"
+          placeholder="筛选目录标题或来源…"
         />
       </label>
+      <button
+        class="button secondary library-content-search"
+        :disabled="busy || !query.trim()"
+        @click="$emit('search', query.trim())"
+      >
+        在问答中检索内容
+      </button>
+      <p class="library-note">
+        目录筛选按标题与来源匹配。内容检索会将关键词填入问答，由你确认发送。
+      </p>
       <div class="knowledge-list">
         <button
           v-for="item in filtered"

@@ -17,6 +17,7 @@ dependencies = [
   "python-dotenv>=1.0,<2",
   "lightrag-hku==1.5.7",
   "fastembed>=0.7,<1",
+  "mcp==1.26.0",
 ]
 
 [project.scripts]

@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import os
 import struct
 from pathlib import Path
 from stat import S_IMODE
@@ -381,9 +382,11 @@ def test_ready_mix_maps_graph_and_real_chunks(settings, monkeypatch):
     assert retrieval["metadata"]["keyword_model"] == settings.model
     assert retrieval["metadata"]["keyword_step"].startswith("LightRAG")
     assert calls == ["initialize", ("显热公式", "mix", 2, 2), "finalize"]
-    assert (
-        S_IMODE((retriever.directory / "kv_store_llm_response_cache.json").stat().st_mode) == 0o600
-    )
+    if os.name == "posix":
+        assert (
+            S_IMODE((retriever.directory / "kv_store_llm_response_cache.json").stat().st_mode)
+            == 0o600
+        )
     assert settings.api_key not in json.dumps(result, ensure_ascii=False)
     assert str(settings.root) not in json.dumps(result, ensure_ascii=False)
 
@@ -508,10 +511,15 @@ def test_index_status_repairs_existing_cache_permissions(settings):
     retriever.directory.chmod(0o755)
     cache.chmod(0o644)
     assert retriever.index_status["state"] == "ready"
-    assert S_IMODE(root.stat().st_mode) == 0o700
-    assert S_IMODE(retriever.directory.stat().st_mode) == 0o700
-    assert S_IMODE(cache.stat().st_mode) == 0o600
-    assert all(S_IMODE(path.stat().st_mode) == 0o600 for path in retriever.directory.iterdir())
+    # Windows permissions use ACLs; mode bits do not express that contract.
+    if os.name == "posix":
+        assert S_IMODE(root.stat().st_mode) == 0o700
+        assert S_IMODE(retriever.directory.stat().st_mode) == 0o700
+        assert S_IMODE(cache.stat().st_mode) == 0o600
+        assert all(S_IMODE(path.stat().st_mode) == 0o600 for path in retriever.directory.iterdir())
+    assert (
+        json.loads(cache.read_text(encoding="utf-8"))["keywords"]["original_prompt"] == "私有查询"
+    )
 
 
 def test_index_directory_symlink_is_rejected_without_following_target(settings):
@@ -583,15 +591,16 @@ def test_build_is_explicit_and_publishes_manifest_last(settings, monkeypatch):
     assert manifest["graph_language"] == "Chinese"
     assert manifest["index_config"] == "zh-v1"
     assert old_marker.read_text(encoding="utf-8") == "preserved"
-    assert S_IMODE(old_marker.stat().st_mode) == 0o600
-    assert (
-        S_IMODE(
-            (HybridRetriever(settings).directory / "kv_store_llm_response_cache.json")
-            .stat()
-            .st_mode
+    if os.name == "posix":
+        assert S_IMODE(old_marker.stat().st_mode) == 0o600
+        assert (
+            S_IMODE(
+                (HybridRetriever(settings).directory / "kv_store_llm_response_cache.json")
+                .stat()
+                .st_mode
+            )
+            == 0o600
         )
-        == 0o600
-    )
     assert build_index(settings)["state"] == "ready"
     assert len(created) == 1
 

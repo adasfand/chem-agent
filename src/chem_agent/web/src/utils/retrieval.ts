@@ -168,3 +168,46 @@ export function graphLayout(entities: RetrievalRecord[], relationships: Retrieva
   })
   return { nodes, edges, width, height, nodeRadius, order }
 }
+
+export function defaultEntityIndex(
+  entities: RetrievalRecord[],
+  relationships: RetrievalRecord[],
+  hits: RetrievalRecord[],
+  citations: string[] = [],
+  keywords: string[] = [],
+  query = '',
+): number {
+  const graph = graphLayout(entities, relationships)
+  if (!graph.nodes.length) return 0
+  const hitIds = new Set(hits.map((hit) => text(hit.chunk_id)).filter(Boolean))
+  const citedHitIds = new Set(citations.filter((id) => hitIds.has(id)))
+  const normalize = (value: string) => value.trim().toLowerCase()
+  const terms = [...new Set(keywords.map(normalize).filter(Boolean))]
+  const queryText = normalize(query)
+  const degree = graph.nodes.map(
+    (node) =>
+      graph.edges.filter((edge) => edge.from.index === node.index || edge.to.index === node.index)
+        .length,
+  )
+  // Initial focus is a display preference based on returned data, not model confidence.
+  // Prefer a node with an actual visible relationship when any are available.
+  const candidates = graph.nodes.filter((node) => !graph.edges.length || degree[node.index])
+  const priorities = (index: number): number[] => {
+    const ids = sourceIds(entities[index]!)
+    const name = normalize(graph.nodes[index]!.name)
+    return [
+      ids.filter((id) => citedHitIds.has(id)).length,
+      ids.filter((id) => hitIds.has(id)).length,
+      terms.filter((term) => name.includes(term) || term.includes(name)).length,
+      queryText && queryText.includes(name) ? 1 : 0,
+      degree[index]!,
+      -index,
+    ]
+  }
+  return candidates.reduce((best, node) => {
+    const candidate = priorities(node.index)
+    const previous = priorities(best)
+    const difference = candidate.findIndex((value, index) => value !== previous[index])
+    return difference >= 0 && candidate[difference]! > previous[difference]! ? node.index : best
+  }, candidates[0]!.index)
+}

@@ -3,6 +3,8 @@ import { computed, nextTick, ref, useId, watch } from 'vue'
 import { Network, Maximize2, ZoomIn, ZoomOut, RotateCcw, X } from '@lucide/vue'
 import {
   graphLayout,
+  defaultEntityIndex,
+  text,
   parts,
   sourceIds,
   entityTypeLabel as typeLabel,
@@ -15,6 +17,10 @@ const props = defineProps<{
   relationships: RetrievalRecord[]
   sources: RetrievalRecord[]
   hits: RetrievalRecord[]
+  citations?: string[]
+  keywords?: string[]
+  query?: string
+  selectionKey?: string
 }>()
 const selected = defineModel<number>('selected', { default: 0 })
 const graph = computed(() => graphLayout(props.entities, props.relationships))
@@ -122,15 +128,30 @@ function changeZoom(delta: number) {
   zoom.value = Math.max(0.3, Math.min(2, Number((zoom.value + delta).toFixed(1))))
 }
 watch(
-  () => props.entities,
+  () =>
+    JSON.stringify([
+      props.selectionKey ?? props.query ?? '',
+      props.entities.map((item) => [
+        text(item.id),
+        text(item.name) || text(item.entity_name),
+        sourceIds(item),
+      ]),
+      props.relationships.map((item) => [
+        text(item.source) || text(item.src_id),
+        text(item.target) || text(item.tgt_id),
+      ]),
+      props.hits.map((item) => text(item.chunk_id)),
+    ]),
   () => {
     close()
-    selected.value = graph.value.nodes.reduce((best, node) => {
-      const degree = (index: number) =>
-        graph.value.edges.filter((edge) => edge.from.index === index || edge.to.index === index)
-          .length
-      return degree(node.index) > degree(best) ? node.index : best
-    }, 0)
+    selected.value = defaultEntityIndex(
+      props.entities,
+      props.relationships,
+      props.hits,
+      props.citations,
+      props.keywords,
+      props.query,
+    )
     filter.value = ''
   },
   { immediate: true },
