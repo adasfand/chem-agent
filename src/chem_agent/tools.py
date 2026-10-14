@@ -4,6 +4,7 @@ import threading
 
 from smolagents import Tool
 
+from chem_agent.engineering_tools import EXTRA_TOOL_DESCRIPTIONS
 from chem_agent.execution import Execution
 from chem_agent.model import RunCancelled
 
@@ -13,6 +14,7 @@ DESCRIPTIONS = {
     "calc_heat_duty": '计算单相恒比热显热负荷。arguments={"mass_flow_kg_s":{"$ref":"s2.value"},"specific_heat_kj_kg_k":4.18,"delta_t_k":40}。比热必须由用户给出，不能查表代填。温差可由明确起止温度作差。若依赖换算步骤，质量流量必须使用 $ref。返回 heat_duty_kw、inputs、assumptions。',
     "calc_mass_balance": '稳态无反应混合衡算。arguments={"streams":[{"flow_kg_h":100,"mass_fraction":0.05},{"flow_kg_h":400,"mass_fraction":0}]}。质量分数必须在0..1，百分数5%写0.05；纯水中盐分数为0。禁止将摩尔分数当质量分数。返回 total_flow_kg_h、component_flow_kg_h、mass_fraction，不返回 value。后续引用混合总流量使用 {"$ref":"s2.total_flow_kg_h"}（s2为实际混合步骤编号）。',
 }
+DESCRIPTIONS.update(EXTRA_TOOL_DESCRIPTIONS)
 
 
 def check_cancelled(cancel_event: threading.Event | None) -> None:
@@ -46,8 +48,8 @@ class BusinessTool(Tool):
 
 class PlanTool(Tool):
     name = "set_plan"
-    description = "登记一次简短业务计划，必须在业务工具之前调用。steps 中每项包含 step_id(s1等)、goal、tool_name、depends_on(前序编号数组)。仅可选 search_knowledge/convert_units/calc_heat_duty/calc_mass_balance。参数不足时不要计划计算，直接请求补充。"
-    inputs = {"steps": {"type": "array", "description": "1–6个依赖顺序排列的步骤对象。"}}
+    description = "登记1至10步业务计划，必须在业务工具之前调用，可作为多工具批次的唯一首项。steps 中每项包含 step_id(s1等)、goal、tool_name、depends_on(前序编号数组)。仅可选注册的9种业务工具（知识检索、单位、显热、混合、温差、体积流量、分流、停留时间、传热量）。显热与混合计算必须直接或经前序依赖连接到已登记的检索步骤；例如s1检索、s2混合(depends_on=['s1'])、s3换算(depends_on=['s2'])、s4显热(depends_on=['s3'])。现有前序检索的必需依赖漏写时，执行器补全并返回dependency_adjustments。参数不足时不要计划计算，直接请求补充。"
+    inputs = {"steps": {"type": "array", "description": "1–10个依赖顺序排列的步骤对象。"}}
     output_type = "object"
 
     def __init__(self, execution: Execution, cancel_event: threading.Event | None = None):
@@ -57,7 +59,7 @@ class PlanTool(Tool):
 
     def forward(self, steps: list[dict]) -> dict:
         check_cancelled(self.cancel_event)
-        return self.execution.set_plan(steps)
+        return self.execution.set_plan(steps, normalize_retrieval_dependencies=True)
 
 
 class FinalTool(Tool):

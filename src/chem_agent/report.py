@@ -6,6 +6,8 @@ import math
 import re
 from typing import Any
 
+from chem_agent.answers import EXTRA_METRICS
+from chem_agent.tool_catalog import NUMERIC_FUNCTIONS, TOOL_METADATA
 from chem_agent.trace import redact
 
 _STATUS = {
@@ -25,6 +27,7 @@ _TOOLS = {
     "calc_heat_duty": "显热热负荷",
     "calc_mass_balance": "混合物料衡算",
 }
+_TOOLS.update({name: tool["title"] for name, tool in TOOL_METADATA.items()})
 _SENSITIVE_KEY = re.compile(r"api.?key|secret|password|authorization|token|key_file", re.I)
 _LOCAL_PATH = re.compile(
     r"file:(?://)?[^\s<>\"'`|]+"
@@ -118,6 +121,9 @@ def _metrics(call: dict) -> list[tuple[str, str, str]]:
         add("混合后总流量", output.get("total_flow_kg_h"), "kg/h")
         add("组分质量流量", output.get("component_flow_kg_h"), "kg/h")
         add("组分质量分数", output.get("mass_fraction"), "1（质量分数，0–1）")
+    elif call.get("tool_name") in EXTRA_METRICS:
+        for field, label, unit in EXTRA_METRICS[call["tool_name"]]:
+            add(label, output.get(field), unit)
     return rows
 
 
@@ -214,9 +220,7 @@ def render_report(result: dict) -> str:
                 + " |"
             )
         output = call.get("output")
-        if call.get("tool_name") in {"calc_heat_duty", "calc_mass_balance"} and isinstance(
-            output, dict
-        ):
+        if call.get("tool_name") in NUMERIC_FUNCTIONS and isinstance(output, dict):
             raw_assumptions = output.get("assumptions")
             if isinstance(raw_assumptions, list):
                 for assumption in raw_assumptions:
@@ -306,7 +310,9 @@ def render_report(result: dict) -> str:
             "",
             "## 适用边界",
             "",
-            "支持常用单位换算、单相恒比热显热计算及稳态无反应混合衡算。物性需明确给定；知识卡是教学说明。",
+            "支持常用单位换算、单相恒比热显热计算、稳态无反应混合衡算，"
+            "以及温差、给定密度的体积流量、两路分流、名义停留时间和恒定功率传热量教学计算。"
+            "物性需明确给定；知识卡是教学说明。",
             "",
             "报告展示已有记录；失败或未执行的步骤不构成成功计算结果。",
         ]

@@ -1,0 +1,111 @@
+{
+  "status": "completed",
+  "run_id": "20261014T080120-70f5625dd6",
+  "plan_steps": 9,
+  "successful_tool_types": [
+    "search_knowledge",
+    "calc_mass_balance",
+    "calc_temperature_change",
+    "convert_units",
+    "calc_volume_flow",
+    "calc_split_flow",
+    "calc_residence_time",
+    "calc_heat_duty",
+    "calc_heating_energy"
+  ],
+  "successful_multi_tool_batches": 3,
+  "model_requests": 6,
+  "values": {
+    "calc_mass_balance": {
+      "total_flow_kg_h": 500.0,
+      "component_flow_kg_h": 5.0,
+      "mass_fraction": 0.01,
+      "assumptions": [
+        "稳态、完全混合；无反应、无泄漏、无积累",
+        "所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1",
+        "所有输入及输出质量流量单位为 kg/h"
+      ]
+    },
+    "calc_temperature_change": {
+      "delta_t_k": 40.0,
+      "inputs": {
+        "inlet_temperature_c": 25.0,
+        "outlet_temperature_c": 65.0
+      },
+      "assumptions": [
+        "输入为摄氏温度；温差 ΔT = 出口温度 − 入口温度，结果单位 K",
+        "正值表示升温，负值表示降温；温差供下游计算使用"
+      ]
+    },
+    "convert_units": {
+      "value": 0.1388888888888889,
+      "unit": "kg/s",
+      "from_value": 500.0,
+      "from_unit": "kg/h"
+    },
+    "calc_volume_flow": {
+      "volume_flow_m3_h": 0.5,
+      "inputs": {
+        "mass_flow_kg_h": 500.0,
+        "density_kg_m3": 1000.0
+      },
+      "assumptions": [
+        "体积流量 V̇ = 质量流量 / 密度，结果单位 m³/h",
+        "密度由用户或有来源的数据明确给定，并适用于当前物料与工况"
+      ]
+    },
+    "calc_split_flow": {
+      "branch_flow_kg_h": 150.0,
+      "remainder_flow_kg_h": 350.0,
+      "split_fraction": 0.3,
+      "inputs": {
+        "total_flow_kg_h": 500.0,
+        "split_fraction": 0.3
+      },
+      "assumptions": [
+        "稳态、无积累、无泄漏的两路分流；分支质量流量 = 总质量流量 × 分流比例",
+        "其余质量流量 = 总质量流量 − 分支质量流量；两路结果单位 kg/h",
+        "分流比例表示流量比例；均匀物料分流时各路组成保持一致"
+      ]
+    },
+    "calc_residence_time": {
+      "residence_time_h": 2.0,
+      "residence_time_min": 120.0,
+      "inputs": {
+        "vessel_volume_m3": 1.0,
+        "volume_flow_m3_h": 0.5
+      },
+      "assumptions": [
+        "稳态、恒定体积流量；名义停留时间 τ = 有效持液体积 / 体积流量",
+        "采用用户给定的有效持液体积与当前工况体积流量，输出 h 和 min"
+      ]
+    },
+    "calc_heat_duty": {
+      "heat_duty_kw": 23.22222222222222,
+      "inputs": {
+        "mass_flow_kg_s": 0.1388888888888889,
+        "specific_heat_kj_kg_k": 4.18,
+        "delta_t_k": 40.0
+      },
+      "assumptions": [
+        "单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差",
+        "无化学反应、无相变；忽略热损失、轴功以及动能、位能变化",
+        "比热需明确给定且适用于该温度区间，不由知识卡代填物性",
+        "正值表示加热，负值表示冷却；结果单位为 kW"
+      ]
+    },
+    "calc_heating_energy": {
+      "energy_kwh": 46.44444444444444,
+      "energy_kj": 167200.0,
+      "inputs": {
+        "heat_duty_kw": 23.22222222222222,
+        "duration_h": 2.0
+      },
+      "assumptions": [
+        "恒定热功率；传热量 E = 热负荷 × 持续时间，1 kWh = 3600 kJ",
+        "正值表示加热传入能量，负值表示冷却移出能量；结果保留热负荷符号",
+        "热负荷采用对应工况的给定值或已成功计算的工具结果"
+      ]
+    }
+  }
+}

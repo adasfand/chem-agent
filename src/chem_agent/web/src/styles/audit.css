@@ -213,6 +213,185 @@
 .audit-plan {
   margin-bottom: 26px;
 }
+.audit-batches {
+  margin-bottom: 26px;
+}
+.audit-batches > .section-help {
+  margin-bottom: 12px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.audit-batch {
+  border: 1px solid #e4e9f2;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 9px;
+}
+.audit-batch > summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+.audit-batch > summary::after {
+  content: '+';
+  margin-left: auto;
+  color: #8b96a8;
+  font-size: 13px;
+}
+.audit-batch[open] > summary::after {
+  content: '−';
+}
+.audit-batch > summary > div {
+  flex: 1;
+  min-width: 0;
+}
+.audit-batch > summary strong {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.audit-batch > summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.audit-batch > summary .badge {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.audit-batch h5 {
+  margin: 16px 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475467;
+}
+.audit-batch-actions,
+.audit-batch-calls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.audit-batch-actions li {
+  display: block;
+  font-size: 11px;
+  padding: 9px 0;
+}
+.audit-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.audit-action-heading > span:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  min-width: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.audit-batch-actions strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.audit-batch-actions small {
+  color: var(--muted);
+  margin-left: auto;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.audit-action-heading .badge {
+  font-size: 9px;
+  white-space: nowrap;
+}
+.audit-action-unrecorded {
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.audit-action-error {
+  margin: 7px 0 0 23px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.audit-dependency-adjustment {
+  margin: 7px 0 0 23px;
+  padding: 8px;
+  color: #32695b;
+  background: #f2f8f5;
+  font-size: 10px;
+  line-height: 1.8;
+  border-radius: 4px;
+}
+.audit-batch-error {
+  padding: 11px;
+  background: #fff5f3;
+  border-left: 2px solid #dc9487;
+  border-radius: 4px;
+  margin: 14px 0 0;
+  color: #943c35;
+}
+.audit-batch-error > strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.audit-batch-error p {
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.audit-batch-calls li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #f0f2f6;
+}
+.audit-batch-calls li > div {
+  min-width: 0;
+  flex: 1;
+}
+.audit-batch-calls strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+.audit-batch-calls small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+  margin-top: 5px;
+}
+.audit-batch-calls .badge {
+  font-size: 9px;
+}
+.audit-batch > .section-help,
+.audit-batch > .audit-event-note {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+.audit-batch pre {
+  padding: 10px;
+  border-radius: 4px;
+  background: #fff5f3;
+  color: #943c35;
+  font-size: 10px;
+  line-height: 1.8;
+  margin: 12px 0 0;
+}
+.audit-batch-link {
+  display: block;
+  color: #5270bc;
+  font-size: 10px;
+  line-height: 1.7;
+  margin-top: 4px;
+}
 .audit-plan li {
   display: flex;
   gap: 9px;
@@ -223,9 +402,10 @@
   background: #f2f4f7;
   color: #667085;
   font-size: 10px;
-  border-radius: 50%;
-  height: 21px;
-  width: 21px;
+  border-radius: 4px;
+  height: 24px;
+  width: 52px;
+  white-space: nowrap;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -243,6 +423,35 @@
   font-size: 10px;
   color: var(--muted);
   margin: 4px 0;
+}
+.audit-plan .audit-plan-method {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.registry-method {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px;
+  margin: 12px 0 16px;
+}
+.registry-method h4 {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin: 0 0 7px;
+}
+.registry-method p {
+  font-size: 12px;
+  color: #344054;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.registry-catalog button .registry-example-label {
+  color: #32705e;
+  font-size: 9px;
+}
+.registry-example-inputs {
+  margin-top: 14px;
 }
 .audit-plan small {
   display: flex;

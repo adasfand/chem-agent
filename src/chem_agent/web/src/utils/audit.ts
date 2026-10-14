@@ -1,4 +1,73 @@
-import type { ModelEvent, RunResult, ToolCall } from '../types/api'
+import type { JsonValue, ModelEvent, RunResult, ToolCall } from '../types/api'
+
+const controlActions = new Set(['set_plan', 'final_answer'])
+const positiveInteger = (value: number | null | undefined): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0
+
+export function batchRequestText(index: number | null | undefined): string {
+  return positiveInteger(index) ? `模型请求 ${index}` : '模型请求编号未记录'
+}
+
+export function auditBatches(result: RunResult) {
+  if (result.tool_batches === undefined) return null
+  const byId = new Map(result.calls.map((call) => [call.call_id, call]))
+  return result.tool_batches.map((batch, index) => ({
+    ...batch,
+    number: index + 1,
+    requestText: batchRequestText(batch.model_request_index),
+    actions: batch.tool_names.map((name, position) => {
+      const action = batch.actions?.find(
+        (item) => item.position === position + 1 && item.tool_name === name,
+      )
+      return {
+        key: `${batch.batch_id}:action:${position + 1}`,
+        name,
+        position: position + 1,
+        control: controlActions.has(name),
+        status: action?.status,
+        error: action?.error,
+        dependencyAdjustments: action?.dependency_adjustments ?? [],
+      }
+    }),
+    calls: [...new Set(batch.call_ids)].flatMap((id) => {
+      const call = byId.get(id)
+      // Associate only explicit records; never match by repeated tool names or guessed order.
+      return call && (!call.batch_id || call.batch_id === batch.batch_id) ? [call] : []
+    }),
+    businessSelections: batch.tool_names.filter((name) => !controlActions.has(name)).length,
+  }))
+}
+
+export function auditBatchMetrics(result: RunResult) {
+  const batches = auditBatches(result)
+  if (batches === null) return null
+  return {
+    selectedMultiple: batches.filter((batch) => batch.businessSelections > 1).length,
+    succeededMultiple: batches.filter(
+      (batch) =>
+        batch.status === 'succeeded' &&
+        batch.calls.filter((call) => call.status === 'succeeded').length > 1,
+    ).length,
+  }
+}
+
+export function auditErrorText(value: JsonValue | undefined): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.map(auditErrorText).filter(Boolean).join('\n')
+  if (typeof value === 'object')
+    return Object.entries(value)
+      .map(([key, detail]) => `${key}：${auditErrorText(detail)}`)
+      .join('\n')
+  return String(value)
+}
+
+export function toolCallBatchText(result: RunResult, call: ToolCall): string | undefined {
+  if (!call.batch_id) return undefined
+  const index = result.tool_batches?.findIndex((batch) => batch.batch_id === call.batch_id) ?? -1
+  const position = positiveInteger(call.batch_position) ? ` · 动作 ${call.batch_position}` : ''
+  return `${index >= 0 ? `第 ${index + 1} 批` : '已关联调用批次'}${position}`
+}
 
 export interface AuditStage {
   title: string

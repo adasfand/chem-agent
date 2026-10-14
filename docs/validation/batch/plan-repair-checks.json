@@ -1,0 +1,111 @@
+{
+  "mode": "offline_scripted_agent_and_browser_fixture",
+  "provider_requests": 0,
+  "records": {
+    "repaired": "plan-repaired.json",
+    "invalid": "plan-invalid.json"
+  },
+  "repaired": {
+    "response_count": 2,
+    "successful_multi_business_batches": 1,
+    "business_calls_succeeded": 4,
+    "heat_duty_kw": 23.22222222222222,
+    "dependency_adjustments": [
+      {
+        "step_id": "s2",
+        "depends_on_added": [
+          "s1"
+        ]
+      }
+    ]
+  },
+  "invalid": {
+    "business_calls": 0,
+    "first_error_preserved": true,
+    "actions": [
+      "failed",
+      "skipped",
+      "skipped"
+    ]
+  },
+  "regression": {
+    "python_passed": 394,
+    "python_skipped": 1,
+    "frontend_passed": 75,
+    "typecheck": true,
+    "build": true,
+    "lint": true,
+    "format": true,
+    "ruff": true
+  },
+  "browser": {
+    "viewports": [
+      [
+        1600,
+        1100
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "mobile_document_width": 390,
+    "console_errors": 0,
+    "console_warnings": 0,
+    "control_action_status_visible": true,
+    "dependency_adjustment_visible": true,
+    "invalid_plan_automatically_expanded": true,
+    "skipped_actions_visible": true
+  },
+  "services_preserved": {
+    "backend_pid": 20512,
+    "frontend_pid": 51300
+  },
+  "source_files": [
+    {
+      "path": "src/chem_agent/agent.py",
+      "sha256": "22b6c9eb067044b4b4cc34d3b8adda2acc6d5126a76c86a8c1b6430777f3b149"
+    },
+    {
+      "path": "src/chem_agent/execution.py",
+      "sha256": "9752a03a83ce4605217b3b2a72f7f2838ae92c6207f6483c1cdf645312dd7a24"
+    },
+    {
+      "path": "src/chem_agent/tools.py",
+      "sha256": "07f1e507d911e955a3745c48f723379a994548dcd8a40784c2b84d500b014def"
+    },
+    {
+      "path": "src/chem_agent/web/src/components/ExecutionAudit.vue",
+      "sha256": "a183ef8622d5b8fc036f17708ae9e672b265e33e7242a43785e5cee2da67ae09"
+    },
+    {
+      "path": "src/chem_agent/web/src/utils/audit.ts",
+      "sha256": "b1931cc63ac5b8cee86506cef91a2f1fe59075c19a2bb52a7989212512155475"
+    },
+    {
+      "path": "src/chem_agent/web/src/types/api.ts",
+      "sha256": "d77e5dcafd5f64f30017aa52c67df99d43e7fbd55e7a55896f1d0e7cc3c1f95a"
+    },
+    {
+      "path": "src/chem_agent/web/src/styles/audit.css",
+      "sha256": "691adf393bf33582c229ce3e4f9a3b4d4663cbe991b1ae8a45fc74ed2e589ac0"
+    },
+    {
+      "path": "tests/test_agent.py",
+      "sha256": "c98a9c7ee2ad4c94cc6e5247a8dfbf3bffb27c05a38c3a661e5717d7c01d8bbf"
+    },
+    {
+      "path": "tests/test_execution.py",
+      "sha256": "7bd413579238410b35d843235dcaeea29b786029a6053c26bf3bae5c0651d514"
+    },
+    {
+      "path": "src/chem_agent/web/tests/audit.test.ts",
+      "sha256": "49d990792d2c7c87a744d8e338eb738687305fa0157a4b7b7ceea7e6f28fa683"
+    }
+  ],
+  "screenshots": [
+    "plan-repaired.png",
+    "plan-repaired-mobile.png",
+    "plan-invalid.png"
+  ]
+}

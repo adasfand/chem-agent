@@ -141,7 +141,9 @@ def test_agent_completes_real_tool_chain_and_observes_results(settings):
     assert "heat_duty_kw" in repr(created[0].received[4])
     assert created[0].client.closed
     assert any(item["calls"] for item in progress)
-    persisted = json.loads(settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text())
+    persisted = json.loads(
+        settings.runs_dir.joinpath(f"{result['run_id']}.json").read_text(encoding="utf-8")
+    )
     assert persisted["status"] == "completed"
 
 
@@ -218,8 +220,8 @@ def test_missing_configuration_is_reported_without_starting_model(settings):
     assert result["calls"] == []
 
 
-@pytest.mark.parametrize("batch_kind", ["business", "final_and_business", "multiple_final"])
-def test_multiple_tool_calls_are_rejected_before_any_action_and_can_be_corrected(
+@pytest.mark.parametrize("batch_kind", ["final_and_business", "multiple_final"])
+def test_unsafe_terminal_batches_are_rejected_before_any_action_and_can_be_corrected(
     settings, batch_kind
 ):
     plan = {
@@ -236,7 +238,6 @@ def test_multiple_tool_calls_are_rejected_before_any_action_and_can_be_corrected
         {"answer": "不应提交的答复。", "status": "needs_input", "citations": []},
     )
     batches = {
-        "business": [("set_plan", plan), conversion],
         "final_and_business": [premature_final, ("set_plan", plan)],
         "multiple_final": [premature_final, premature_final],
     }
@@ -266,7 +267,9 @@ def test_multiple_tool_calls_are_rejected_before_any_action_and_can_be_corrected
     assert len(result["calls"]) == 1
     assert not progress[0]["plan"] and not progress[0]["calls"]
     assert progress[0]["status"] == "running"
-    assert "每次回复只允许调用一个工具" in repr(model.received[1])
+    assert "final_answer 必须单独调用" in repr(model.received[1])
+    rejected = result["tool_batches"][0]
+    assert rejected["status"] == "failed" and rejected["call_ids"] == []
 
 
 def test_finished_answer_survives_a_late_progress_callback_failure(settings):
@@ -319,7 +322,9 @@ def test_finished_answer_survives_a_late_progress_callback_failure(settings):
 def test_agent_validates_user_capacity_before_calculating(settings, question, history, status):
     # The retrieved example must never count as user-supplied heat capacity.
     card = settings.knowledge_dir / "heat.md"
-    card.write_text(card.read_text() + "\n教学算例比热4.18 kJ/(kg·K)。\n")
+    card.write_text(
+        card.read_text(encoding="utf-8") + "\n教学算例比热4.18 kJ/(kg·K)。\n", encoding="utf-8"
+    )
 
     def factory(_settings, trace):
         def script(index):
@@ -366,3 +371,504 @@ def test_agent_validates_user_capacity_before_calculating(settings, question, hi
         assert heat["input_provenance"][0]["source"] == "user"
         assert heat["input_provenance"][0]["value"] == pytest.approx(4.18)
         assert "46.4444444444 kW" in result["answer"]
+
+
+def test_model_can_submit_plan_and_multiple_independent_tools_in_one_batch(settings):
+    plan = [
+        {"step_id": "s1", "goal": "压力换算", "tool_name": "convert_units"},
+        {"step_id": "s2", "goal": "温度换算", "tool_name": "convert_units"},
+    ]
+    model = ScriptedModel(
+        [
+            [
+                ("set_plan", {"steps": plan}),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 2.5, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s2",
+                        "arguments": {"value": 25, "from_unit": "degC", "to_unit": "K"},
+                    },
+                ),
+            ],
+            ("final_answer", {"answer": "已换算。", "status": "completed", "citations": []}),
+        ]
+    )
+    result = run_task("换算2.5 MPa和25℃。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "completed"
+    assert len(model.received) == 2
+    assert [call["output"]["value"] for call in result["calls"]] == [2500, 298.15]
+    assert "2500" in repr(model.received[1]) and "298.15" in repr(model.received[1])
+    batch = result["tool_batches"][0]
+    assert batch["tool_names"] == ["set_plan", "convert_units", "convert_units"]
+    assert batch["agent_step"] == 1 and batch["model_request_index"] is None
+    assert batch["execution_mode"] == "ordered" and batch["status"] == "succeeded"
+    assert batch["call_ids"] == ["call_1", "call_2"]
+    assert [call["batch_position"] for call in result["calls"]] == [2, 3]
+    assert all(call["batch_id"] == batch["batch_id"] for call in result["calls"])
+
+
+def test_invalid_plan_stops_remaining_batch_actions_and_keeps_first_error(settings):
+    model = ScriptedModel(
+        [
+            [
+                (
+                    "set_plan",
+                    {
+                        "steps": [
+                            {"step_id": "s2", "goal": "计算混合", "tool_name": "calc_mass_balance"}
+                        ]
+                    },
+                ),
+                ("search_knowledge", {"step_id": "s1", "arguments": {"query": "显热"}}),
+                (
+                    "calc_mass_balance",
+                    {
+                        "step_id": "s2",
+                        "arguments": {"streams": [{"flow_kg_h": 500, "mass_fraction": 0.01}]},
+                    },
+                ),
+            ],
+            ("final_answer", {"answer": "执行计划需要补充。", "status": "failed", "citations": []}),
+        ]
+    )
+    result = run_task("计算混合流量。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "failed"
+    batch = result["tool_batches"][0]
+    assert batch["status"] == "failed" and "计算计划需要先检索" in batch["error"]
+    assert [a["status"] for a in batch["actions"]] == ["failed", "skipped", "skipped"]
+    assert result["calls"] == [] and batch["call_ids"] == []
+    assert '"status": "skipped"' in repr(model.received[1])
+    assert "工具和步骤必须与已登记计划一致" not in repr(model.received[1])
+
+
+@pytest.mark.parametrize("missing_search_dependency", [False, True])
+def test_one_batch_reuses_real_search_mix_conversion_and_heat_outputs(
+    settings, missing_search_dependency
+):
+    def factory(_settings, trace):
+        plan = [
+            {"step_id": "s1", "goal": "检索公式", "tool_name": "search_knowledge"},
+            {
+                "step_id": "s2",
+                "goal": "混合",
+                "tool_name": "calc_mass_balance",
+                "depends_on": ["s1"],
+            },
+            {
+                "step_id": "s3",
+                "goal": "换算混合流量",
+                "tool_name": "convert_units",
+                "depends_on": ["s2"],
+            },
+            {
+                "step_id": "s4",
+                "goal": "计算热负荷",
+                "tool_name": "calc_heat_duty",
+                "depends_on": ["s1", "s3"],
+            },
+        ]
+        if missing_search_dependency:
+            plan[1]["depends_on"] = []
+
+        def script(index):
+            if index == 0:
+                return [
+                    ("set_plan", {"steps": plan}),
+                    ("search_knowledge", {"step_id": "s1", "arguments": {"query": "显热热负荷"}}),
+                    (
+                        "calc_mass_balance",
+                        {
+                            "step_id": "s2",
+                            "arguments": {
+                                "streams": [
+                                    {"flow_kg_h": 100, "mass_fraction": 0.05},
+                                    {"flow_kg_h": 400, "mass_fraction": 0},
+                                ]
+                            },
+                        },
+                    ),
+                    (
+                        "convert_units",
+                        {
+                            "step_id": "s3",
+                            "arguments": {
+                                "value": {"$ref": "s2.total_flow_kg_h"},
+                                "from_unit": "kg/h",
+                                "to_unit": "kg/s",
+                            },
+                        },
+                    ),
+                    (
+                        "calc_heat_duty",
+                        {
+                            "step_id": "s4",
+                            "arguments": {
+                                "mass_flow_kg_s": {"$ref": "s3.value"},
+                                "specific_heat_kj_kg_k": 4.18,
+                                "delta_t_k": 40,
+                            },
+                        },
+                    ),
+                ]
+            return "final_answer", {
+                "answer": "计算完成。",
+                "status": "completed",
+                "citations": [trace.data["evidence"][0]["chunk_id"]],
+            }
+
+        return ScriptedModel(script)
+
+    result = run_task(
+        "100和400 kg/h混合后升温40 K，比热4.18 kJ/(kg·K)。", settings, model_factory=factory
+    )
+    assert result["status"] == "completed"
+    assert [call["status"] for call in result["calls"]] == ["succeeded"] * 4
+    assert result["calls"][2]["input_refs"][0]["ref"] == "s2.total_flow_kg_h"
+    assert result["calls"][3]["input_refs"][0]["ref"] == "s3.value"
+    assert result["calls"][3]["output"]["heat_duty_kw"] == pytest.approx(500 / 3600 * 4.18 * 40)
+    assert result["tool_batches"][0]["call_ids"] == ["call_1", "call_2", "call_3", "call_4"]
+    actions = result["tool_batches"][0]["actions"]
+    assert [a["status"] for a in actions] == ["succeeded"] * 5
+    if missing_search_dependency:
+        assert actions[0]["dependency_adjustments"] == [
+            {"step_id": "s2", "depends_on_added": ["s1"]}
+        ]
+        assert result["plan"][1]["depends_on"] == ["s1"]
+
+
+def test_failed_dependency_does_not_erase_independent_observations_and_can_be_retried(settings):
+    plan = [
+        {"step_id": "s1", "goal": "流量换算", "tool_name": "convert_units"},
+        {"step_id": "s2", "goal": "回用流量", "tool_name": "convert_units", "depends_on": ["s1"]},
+        {"step_id": "s3", "goal": "压力换算", "tool_name": "convert_units"},
+    ]
+    reference = (
+        "convert_units",
+        {
+            "step_id": "s2",
+            "arguments": {
+                "value": {"$ref": "s1.value"},
+                "from_unit": "kg/s",
+                "to_unit": "kg/h",
+            },
+        },
+    )
+    model = ScriptedModel(
+        [
+            [
+                ("set_plan", {"steps": plan}),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 3600, "from_unit": "kg/h", "to_unit": "kPa"},
+                    },
+                ),
+                reference,
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s3",
+                        "arguments": {"value": 2, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+            ],
+            [
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 3600, "from_unit": "kg/h", "to_unit": "kg/s"},
+                    },
+                ),
+                reference,
+            ],
+            ("final_answer", {"answer": "已换算。", "status": "completed", "citations": []}),
+        ]
+    )
+    result = run_task("换算流量与压力。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "completed"
+    assert [call["status"] for call in result["calls"]] == [
+        "failed",
+        "failed",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+    ]
+    assert "前序步骤未成功" in result["calls"][1]["error"]
+    assert "output" not in result["calls"][0] and "output" not in result["calls"][1]
+    assert "量纲" in repr(model.received[1]) and "前序步骤未成功" in repr(model.received[1])
+    assert "2000" in repr(model.received[1])
+    assert result["tool_batches"][0]["status"] == "failed"
+    assert result["tool_batches"][1]["status"] == "succeeded"
+
+
+def test_cancel_between_batch_actions_keeps_first_result_and_never_runs_second(settings):
+    import threading
+
+    cancel = threading.Event()
+    model = ScriptedModel(
+        [
+            [
+                (
+                    "set_plan",
+                    {
+                        "steps": [
+                            {"step_id": "s1", "goal": "压力换算", "tool_name": "convert_units"},
+                            {"step_id": "s2", "goal": "另一次换算", "tool_name": "convert_units"},
+                        ]
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s2",
+                        "arguments": {"value": 2, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+            ]
+        ]
+    )
+
+    def progress(result):
+        if result["calls"]:
+            cancel.set()
+
+    result = run_task(
+        "换算压力。",
+        settings,
+        model_factory=lambda *_: model,
+        cancel_event=cancel,
+        on_progress=progress,
+    )
+    assert result["status"] == "cancelled"
+    assert len(result["calls"]) == 1 and result["calls"][0]["output"]["value"] == 1000
+    assert result["plan"][1]["status"] == "pending"
+    assert result["tool_batches"][0]["status"] == "cancelled"
+    assert result["tool_batches"][0]["call_ids"] == ["call_1"]
+
+
+@pytest.mark.parametrize("order", ["late", "duplicate"])
+def test_plan_must_be_unique_first_action_before_any_batch_side_effect(settings, order):
+    plan = (
+        "set_plan",
+        {"steps": [{"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units"}]},
+    )
+    conversion = (
+        "convert_units",
+        {"step_id": "s1", "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"}},
+    )
+    batch = [conversion, plan] if order == "late" else [plan, plan, conversion]
+    model = ScriptedModel(
+        [
+            batch,
+            ("final_answer", {"answer": "请确认单位。", "status": "needs_input", "citations": []}),
+        ]
+    )
+    result = run_task("换算压力。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "needs_input" and result["plan"] == [] and result["calls"] == []
+    assert result["tool_batches"][0]["status"] == "failed"
+    assert "set_plan 必须" in repr(model.received[1])
+
+
+def test_batch_links_to_one_based_recorded_model_requests(settings):
+    def factory(_settings, trace):
+        class RecordedModel(ScriptedModel):
+            def generate(self, *args, **kwargs):
+                response = super().generate(*args, **kwargs)
+                trace.data["model_requests"].append(
+                    {
+                        "status": "succeeded",
+                        "selected_tools": [call.function.name for call in response.tool_calls],
+                    }
+                )
+                return response
+
+        return RecordedModel(
+            [
+                [
+                    (
+                        "set_plan",
+                        {
+                            "steps": [
+                                {"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units"}
+                            ]
+                        },
+                    ),
+                    (
+                        "convert_units",
+                        {
+                            "step_id": "s1",
+                            "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"},
+                        },
+                    ),
+                ],
+                ("final_answer", {"answer": "完成。", "status": "completed", "citations": []}),
+            ]
+        )
+
+    result = run_task("换算压力。", settings, model_factory=factory)
+    assert result["status"] == "completed"
+    assert [batch["model_request_index"] for batch in result["tool_batches"]] == [1, 2]
+    for batch in result["tool_batches"]:
+        assert (
+            batch["tool_names"]
+            == result["model_requests"][batch["model_request_index"] - 1]["selected_tools"]
+        )
+
+
+def test_duplicate_response_ids_are_rejected_before_plan_registration(settings):
+    class DuplicateModel(ScriptedModel):
+        def generate(self, *args, **kwargs):
+            response = super().generate(*args, **kwargs)
+            if len(self.received) == 1:
+                response.tool_calls[1].id = response.tool_calls[0].id
+            return response
+
+    model = DuplicateModel(
+        [
+            [
+                (
+                    "set_plan",
+                    {
+                        "steps": [
+                            {"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units"}
+                        ]
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+            ],
+            ("final_answer", {"answer": "请确认单位。", "status": "needs_input", "citations": []}),
+        ]
+    )
+    result = run_task("换算压力。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "needs_input" and result["plan"] == [] and result["calls"] == []
+    assert "编号不能重复" in result["tool_batches"][0]["error"]
+
+
+def test_cancel_wrapped_by_framework_never_becomes_a_retry_observation(settings, monkeypatch):
+    import threading
+
+    from chem_agent.tools import BusinessTool
+
+    cancel = threading.Event()
+    original = BusinessTool.forward
+
+    def cancelling_forward(self, step_id: str, arguments: dict) -> dict:
+        cancel.set()
+        return original(self, step_id, arguments)
+
+    monkeypatch.setattr(BusinessTool, "forward", cancelling_forward)
+    model = ScriptedModel(
+        [
+            [
+                (
+                    "set_plan",
+                    {
+                        "steps": [
+                            {"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units"}
+                        ]
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+            ]
+        ]
+    )
+    result = run_task("换算压力。", settings, model_factory=lambda *_: model, cancel_event=cancel)
+    assert result["status"] == "cancelled" and result["calls"] == []
+    assert result["tool_batches"][0]["status"] == "cancelled" and len(model.received) == 1
+
+
+def test_final_validation_failure_returns_the_actionable_reason_for_retry(settings):
+    model = ScriptedModel(
+        [
+            ("final_answer", {"answer": "完成。", "status": "completed", "citations": []}),
+            ("final_answer", {"answer": "请补充条件。", "status": "needs_input", "citations": []}),
+        ]
+    )
+    result = run_task("计算热负荷。", settings, model_factory=lambda *_: model)
+    assert result["status"] == "needs_input"
+    assert "计划尚未全部成功" in repr(model.received[1])
+    assert result["tool_batches"][0]["status"] == "failed"
+
+
+def test_unexpected_business_failure_is_sanitized_and_later_action_still_observed(
+    settings, monkeypatch
+):
+    from chem_agent.execution import Execution
+
+    original = Execution.__init__
+
+    def init(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        actual = self.functions["convert_units"]
+
+        def convert(**arguments):
+            if arguments["value"] == 1:
+                raise RuntimeError("provider-private-payload offline-dummy-key")
+            return actual(**arguments)
+
+        self.functions["convert_units"] = convert
+
+    monkeypatch.setattr(Execution, "__init__", init)
+    model = ScriptedModel(
+        [
+            [
+                (
+                    "set_plan",
+                    {
+                        "steps": [
+                            {"step_id": "s1", "goal": "换算压力", "tool_name": "convert_units"},
+                            {"step_id": "s2", "goal": "另一换算", "tool_name": "convert_units"},
+                        ]
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s1",
+                        "arguments": {"value": 1, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+                (
+                    "convert_units",
+                    {
+                        "step_id": "s2",
+                        "arguments": {"value": 2, "from_unit": "MPa", "to_unit": "kPa"},
+                    },
+                ),
+            ],
+            ("final_answer", {"answer": "请稍后重试。", "status": "failed", "citations": []}),
+        ]
+    )
+    result = run_task("换算压力。", settings, model_factory=lambda *_: model)
+    assert [call["status"] for call in result["calls"]] == ["failed", "succeeded"]
+    assert "2000" in repr(model.received[1]) and "工具执行失败" in repr(model.received[1])
+    assert "provider-private-payload" not in json.dumps(result, ensure_ascii=False)
+    assert settings.api_key not in json.dumps(result, ensure_ascii=False)

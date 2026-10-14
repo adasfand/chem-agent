@@ -8,8 +8,12 @@ import {
   auditTimeline,
   durationText,
   emptyPlanText,
+  auditBatches,
+  toolCallBatchText,
+  auditBatchMetrics,
+  auditErrorText,
 } from '../utils/audit'
-import { toolLabels } from '../utils/presentation'
+import { toolAlgorithms, toolLabels } from '../utils/presentation'
 import StatusBadge from './StatusBadge.vue'
 import ExecutionTrace from './ExecutionTrace.vue'
 
@@ -18,6 +22,8 @@ const metrics = computed(() => auditMetrics(props.result))
 const timeline = computed(() => auditTimeline(props.result))
 const contextEvidence = computed(() => props.result.context_evidence ?? [])
 const stages = computed(() => auditStages(props.result))
+const batches = computed(() => auditBatches(props.result))
+const batchMetrics = computed(() => auditBatchMetrics(props.result))
 const labels: Record<string, string> = {
   ...toolLabels,
   set_plan: '登记执行计划',
@@ -80,12 +86,12 @@ const clock = (value?: string) =>
         <small>{{ result.status === 'running' ? '任务结束后记录' : '从开始到结束' }}</small>
       </div>
       <div>
-        <dt>工具成功调用</dt>
+        <dt>业务工具成功调用</dt>
         <dd>
           {{ metrics.succeeded }}
           <span>/ {{ metrics.callCount }}</span>
         </dd>
-        <small>按实际调用统计</small>
+        <small>成功 / 实际业务调用</small>
       </div>
       <div>
         <dt>Agent 模型请求</dt>
@@ -118,10 +124,13 @@ const clock = (value?: string) =>
       <p v-if="!result.plan.length" class="section-help">{{ emptyPlanText(result) }}</p>
       <ol v-else>
         <li v-for="(step, index) in result.plan" :key="step.step_id">
-          <span class="audit-plan-index">{{ index + 1 }}</span>
+          <span class="audit-plan-index">Step {{ index + 1 }}</span>
           <div>
             <strong>{{ step.goal }}</strong>
             <p>{{ labels[step.tool_name] || step.tool_name }}</p>
+            <p v-if="step.algorithm || toolAlgorithms[step.tool_name]" class="audit-plan-method">
+              算法：{{ step.algorithm || toolAlgorithms[step.tool_name] }}
+            </p>
             <small v-if="step.depends_on.length">
               <ArrowDownRight :size="12" />
               接续 {{ step.depends_on.map(dependencyLabel).join('、') }}
@@ -130,6 +139,80 @@ const clock = (value?: string) =>
           <StatusBadge :status="step.status" />
         </li>
       </ol>
+    </section>
+    <section v-if="batches?.length" class="audit-batches" aria-label="工具调用批次">
+      <h4>
+        工具调用批次
+        <span>{{ batches.length }} 批</span>
+      </h4>
+      <p class="section-help">
+        选择多项业务调用的批次 {{ batchMetrics?.selectedMultiple ?? 0 }}；
+        实际成功执行多项业务调用的批次 {{ batchMetrics?.succeededMultiple ?? 0 }}。
+        后项仅统计整批成功且至少两次业务调用成功的批次。同一响应中的动作按顺序执行，并校验计划依赖。
+      </p>
+      <details
+        v-for="batch in batches"
+        :key="batch.batch_id"
+        class="audit-batch"
+        :open="batch.status === 'failed'"
+      >
+        <summary>
+          <div>
+            <strong>第 {{ batch.number }} 批 · {{ batch.actions.length }} 项动作</strong>
+            <small>{{ batch.requestText }} · {{ durationText(batch.latency_ms) }}</small>
+          </div>
+          <StatusBadge :status="batch.status" />
+        </summary>
+        <h5>同一响应选择的动作与执行状态</h5>
+        <ol class="audit-batch-actions">
+          <li v-for="action in batch.actions" :key="action.key">
+            <div class="audit-action-heading">
+              <span>{{ action.position }}</span>
+              <strong>{{ labels[action.name] || action.name }}</strong>
+              <small>{{ action.control ? '控制动作' : '业务工具' }}</small>
+              <StatusBadge v-if="action.status" :status="action.status" />
+              <span v-else class="audit-action-unrecorded">状态未保存</span>
+            </div>
+            <p v-if="action.error" class="audit-action-error">{{ action.error }}</p>
+            <p
+              v-for="(adjustment, index) in action.dependencyAdjustments"
+              :key="index"
+              class="audit-dependency-adjustment"
+            >
+              {{ dependencyLabel(adjustment.step_id) }} 补充前序依赖：{{
+                adjustment.depends_on_added.map(dependencyLabel).join('、')
+              }}。
+            </p>
+          </li>
+        </ol>
+        <h5>实际业务调用 · {{ batch.calls.length }} 次</h5>
+        <ul class="audit-batch-calls">
+          <li v-for="call in batch.calls" :key="call.call_id">
+            <div>
+              <strong>{{ labels[call.tool_name] || call.tool_name }}</strong>
+              <small>
+                {{ toolCallBatchText(result, call) || '响应中位置未记录' }} ·
+                {{ dependencyLabel(call.step_id) }}
+              </small>
+            </div>
+            <StatusBadge :status="call.status" />
+          </li>
+        </ul>
+        <p v-if="!batch.calls.length" class="section-help">
+          {{
+            batch.status === 'running'
+              ? '业务调用开始后显示对应记录。'
+              : '本批没有实际业务调用记录；所选动作的执行状态见上方。'
+          }}
+        </p>
+        <p v-if="batch.status === 'cancelled'" class="audit-event-note">
+          本批已取消，实际执行情况以已保存的业务调用记录为准。
+        </p>
+        <div v-if="batch.error != null" class="audit-batch-error">
+          <strong>本批首次错误</strong>
+          <p>{{ auditErrorText(batch.error) }}</p>
+        </div>
+      </details>
     </section>
     <h4 class="audit-timeline-heading">
       执行时间线
@@ -158,6 +241,12 @@ const clock = (value?: string) =>
                     : labels[entry.call.tool_name] || entry.call.tool_name
                 }}
               </strong>
+              <span
+                v-if="entry.kind === 'tool' && toolCallBatchText(result, entry.call)"
+                class="audit-batch-link"
+              >
+                {{ toolCallBatchText(result, entry.call) }}
+              </span>
               <span
                 v-if="entry.kind === 'model' && entry.model.selected_tools?.length"
                 class="audit-action-hint"

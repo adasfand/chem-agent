@@ -6,7 +6,7 @@ import inspect
 import re
 from copy import deepcopy
 from time import perf_counter
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,20 +15,27 @@ from chem_agent.answers import (
     calculation_explanation,
     requires_concept_explanation,
 )
-from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
-from chem_agent.inputs import supplied_specific_heat
+from chem_agent.calculations import convert_units
+from chem_agent.inputs import supplied_density, supplied_specific_heat
 from chem_agent.knowledge import KnowledgeBase
+from chem_agent.tool_catalog import (
+    MAX_PLAN_STEPS,
+    MAX_TOOL_ATTEMPTS,
+    NUMERIC_FUNCTIONS,
+    RETRIEVAL_REQUIRED_TOOLS,
+    TOOL_METADATA,
+    ToolName,
+)
+from chem_agent.tool_catalog import TOOL_NAMES as TOOL_NAMES
 from chem_agent.trace import RunTrace, utc_now
-
-TOOL_NAMES = {"search_knowledge", "convert_units", "calc_heat_duty", "calc_mass_balance"}
 
 
 class PlanStep(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     step_id: str = Field(pattern=r"^s[1-9][0-9]?$", max_length=3)
     goal: str = Field(min_length=1, max_length=200)
-    tool_name: Literal["search_knowledge", "convert_units", "calc_heat_duty", "calc_mass_balance"]
-    depends_on: list[str] = Field(default_factory=list, max_length=6)
+    tool_name: ToolName
+    depends_on: list[str] = Field(default_factory=list, max_length=MAX_PLAN_STEPS)
 
 
 class Execution:
@@ -48,31 +55,51 @@ class Execution:
         self.results: dict[str, dict] = {}
         self.functions = {
             "search_knowledge": knowledge.search,
-            "convert_units": convert_units,
-            "calc_heat_duty": calc_heat_duty,
-            "calc_mass_balance": calc_mass_balance,
+            **NUMERIC_FUNCTIONS,
         }
 
-    def set_plan(self, steps: list[dict]) -> dict:
+    def set_plan(
+        self, steps: list[dict], *, normalize_retrieval_dependencies: bool = False
+    ) -> dict:
         if self.trace.data["status"] != "running":
             raise ValueError("任务已经结束。")
         if self.trace.data["plan"]:
             raise ValueError("本次任务已建立计划；请按现有步骤执行或说明阻塞原因。")
-        if not isinstance(steps, list) or not 1 <= len(steps) <= 6:
-            raise ValueError("计划需要包含 1–6 个步骤。")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_PLAN_STEPS:
+            raise ValueError(f"计划需要包含 1–{MAX_PLAN_STEPS} 个步骤。")
         parsed = [PlanStep.model_validate(step) for step in steps]
+        seen = set()
+        for step in parsed:
+            if step.step_id in seen or not set(step.depends_on) <= seen:
+                raise ValueError("步骤编号不能重复；依赖只能指向计划中更早的步骤。")
+            seen.add(step.step_id)
+        adjustments = []
         if self.require_retrieval:
             ancestors: dict[str, set[str]] = {}
-            searches = {step.step_id for step in parsed if step.tool_name == "search_knowledge"}
+            searches: list[str] = []
             for step in parsed:
+                if step.tool_name == "search_knowledge":
+                    searches.append(step.step_id)
                 dependencies = set(step.depends_on)
                 for dependency in step.depends_on:
                     dependencies.update(ancestors.get(dependency, set()))
-                ancestors[step.step_id] = dependencies
-                if step.tool_name in {"calc_heat_duty", "calc_mass_balance"} and not (
-                    dependencies & searches
+                if step.tool_name in RETRIEVAL_REQUIRED_TOOLS and not (
+                    dependencies & set(searches)
                 ):
-                    raise ValueError("计算计划需要先检索公式与适用条件，并依赖该检索步骤。")
+                    if not normalize_retrieval_dependencies or not searches:
+                        raise ValueError("计算计划需要先检索公式与适用条件，并依赖该检索步骤。")
+                    # Supply only an existing, earlier knowledge prerequisite.
+                    # Numerical references and user parameters remain model-selected.
+                    required_search = searches[-1]
+                    step.depends_on = PlanStep.model_validate(
+                        step.model_dump() | {"depends_on": [*step.depends_on, required_search]}
+                    ).depends_on
+                    dependencies.add(required_search)
+                    dependencies.update(ancestors[required_search])
+                    adjustments.append(
+                        {"step_id": step.step_id, "depends_on_added": [required_search]}
+                    )
+                ancestors[step.step_id] = dependencies
         if (
             self.requires_explanation
             and any(step.tool_name != "search_knowledge" for step in parsed)
@@ -81,14 +108,21 @@ class Execution:
             raise ValueError(
                 "用户明确要求概念解释；请在计划中加入 search_knowledge，再执行换算或计算。"
             )
-        seen = set()
-        for step in parsed:
-            if step.step_id in seen or not set(step.depends_on) <= seen:
-                raise ValueError("步骤编号不能重复；依赖只能指向计划中更早的步骤。")
-            seen.add(step.step_id)
-        self.trace.data["plan"] = [dict(step.model_dump(), status="pending") for step in parsed]
+        self.trace.data["plan"] = [
+            dict(
+                step.model_dump(),
+                status="pending",
+                algorithm=TOOL_METADATA[step.tool_name]["algorithm"],
+            )
+            for step in parsed
+        ]
+        if adjustments:
+            self.trace.data["plan_dependency_adjustments"] = deepcopy(adjustments)
         self.trace.save()
-        return {"status": "accepted", "steps": self.trace.data["plan"]}
+        result = {"status": "accepted", "steps": self.trace.data["plan"]}
+        if adjustments:
+            result["dependency_adjustments"] = adjustments
+        return result
 
     def _resolve(
         self, value: Any, dependencies: list[str], refs: list[dict], path="", units=None
@@ -112,6 +146,14 @@ class Execution:
                 expected_unit = {
                     "mass_flow_kg_s": "kg/s",
                     "delta_t_k": "delta_K",
+                    "mass_flow_kg_h": "kg/h",
+                    "total_flow_kg_h": "kg/h",
+                    "volume_flow_m3_h": "m3/h",
+                    "vessel_volume_m3": "m3",
+                    "heat_duty_kw": "kW",
+                    "duration_h": "h",
+                    "inlet_temperature_c": "degC",
+                    "outlet_temperature_c": "degC",
                 }.get(path)
                 if re.fullmatch(r"streams\[\d+\]\.flow_kg_h", path):
                     expected_unit = "kg/h"
@@ -125,6 +167,16 @@ class Execution:
                         "component_flow_kg_h": "kg/h",
                         "mass_flow_kg_s": "kg/s",
                         "delta_t_k": "delta_K",
+                        "branch_flow_kg_h": "kg/h",
+                        "remainder_flow_kg_h": "kg/h",
+                        "volume_flow_m3_h": "m3/h",
+                        "heat_duty_kw": "kW",
+                        "residence_time_h": "h",
+                        "energy_kwh": "kWh",
+                        "energy_kj": "kJ",
+                        "inlet_temperature_c": "degC",
+                        "outlet_temperature_c": "degC",
+                        "vessel_volume_m3": "m3",
                     }.get(parts[-1])
                 )
                 record = {"argument": path, "ref": ref, "value": deepcopy(resolved)}
@@ -139,8 +191,10 @@ class Execution:
                         value=converted,
                     )
                     resolved = converted
-                if path == "specific_heat_kj_kg_k":
-                    raise ValueError("当前工具不能提供比热，请使用用户明确给出的比热。")
+                if path in {"specific_heat_kj_kg_k", "density_kg_m3"}:
+                    raise ValueError("当前工具不能提供比热或密度，请使用用户明确给出的物性。")
+                if path == "split_fraction" and parts[-1] != "split_fraction":
+                    raise ValueError("分流比例只能引用明确的split_fraction字段。")
                 if (
                     re.fullmatch(r"streams\[\d+\]\.mass_fraction", path)
                     and parts[-1] != "mass_fraction"
@@ -173,10 +227,21 @@ class Execution:
             "started_at": utc_now(),
             "status": "running",
         }
+        if self.trace.active_batch_id is not None:
+            call.update(
+                batch_id=self.trace.active_batch_id,
+                batch_position=self.trace.active_batch_position,
+            )
+            batch = next(
+                item
+                for item in self.trace.data["tool_batches"]
+                if item["batch_id"] == self.trace.active_batch_id
+            )
+            batch["call_ids"].append(call["call_id"])
         self.trace.data["calls"].append(call)
         step = next((s for s in self.trace.data["plan"] if s["step_id"] == step_id), None)
         try:
-            if len(self.trace.data["calls"]) > 12:
+            if len(self.trace.data["calls"]) > MAX_TOOL_ATTEMPTS:
                 raise ValueError("已达到本次任务的工具调用次数上限。")
             if not step or step["tool_name"] != tool_name:
                 raise ValueError("工具和步骤必须与已登记计划一致。")
@@ -227,6 +292,10 @@ class Execution:
                         resolved["specific_heat_kj_kg_k"], self.trusted_user_inputs
                     )
                 ]
+            if tool_name == "calc_volume_flow" and self.trusted_user_inputs is not None:
+                call["input_provenance"] = [
+                    supplied_density(resolved["density_kg_m3"], self.trusted_user_inputs)
+                ]
             step["status"] = "running"
             self.trace.save()
             output = self.functions[tool_name](**resolved)
@@ -244,6 +313,14 @@ class Execution:
                 step["status"] = "failed"
             call.update(status="failed", error=str(exc))
             raise ValueError(str(exc)) from None
+        except Exception:
+            # Provider/library exceptions may contain private payloads. Persist a
+            # bounded error while preserving this attempted action's failed state.
+            if step and step["status"] != "succeeded":
+                step["status"] = "failed"
+            message = "工具执行失败，请稍后重试。"
+            call.update(status="failed", error=message)
+            raise ValueError(message) from None
         finally:
             call["finished_at"] = utc_now()
             call["latency_ms"] = round((perf_counter() - started) * 1000, 3)

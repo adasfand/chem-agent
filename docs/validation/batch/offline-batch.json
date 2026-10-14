@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "run_id": "20261014T030746-72d8e8a83a",
+  "mode": "offline_test",
+  "started_at": "2026-10-14T03:07:46.388157+00:00",
+  "question": "稳态、无反应、无积累、充分混合条件下，100 kg/h、盐质量分数5%的溶液与400 kg/h纯水混合，随后从25℃加热至65℃。比热明确给定4.18 kJ/(kg·K)，假设单相、恒比热、无相变、忽略热损失。求混合组成、流量换算和显热负荷。",
+  "knowledge_version": "e412b3d7c9e1608c5925befd47f06163b4aaf7d4b49e93032c8b01853f558873",
+  "status": "completed",
+  "plan": [
+    {
+      "step_id": "s1",
+      "goal": "检索混合与显热公式及适用条件",
+      "tool_name": "search_knowledge",
+      "depends_on": [],
+      "status": "succeeded"
+    },
+    {
+      "step_id": "s2",
+      "goal": "计算混合总流量与盐质量分数",
+      "tool_name": "calc_mass_balance",
+      "depends_on": [
+        "s1"
+      ],
+      "status": "succeeded"
+    },
+    {
+      "step_id": "s3",
+      "goal": "将混合总流量由kg/h换为kg/s",
+      "tool_name": "convert_units",
+      "depends_on": [
+        "s2"
+      ],
+      "status": "succeeded"
+    },
+    {
+      "step_id": "s4",
+      "goal": "由给定比热与温差计算显热负荷",
+      "tool_name": "calc_heat_duty",
+      "depends_on": [
+        "s1",
+        "s3"
+      ],
+      "status": "succeeded"
+    }
+  ],
+  "calls": [
+    {
+      "call_id": "call_1",
+      "step_id": "s1",
+      "tool_name": "search_knowledge",
+      "requested_arguments": {
+        "query": "显热热负荷计算 混合衡算 稳态质量守恒",
+        "top_k": 3
+      },
+      "arguments": {
+        "query": "显热热负荷计算 混合衡算 稳态质量守恒",
+        "top_k": 3
+      },
+      "input_refs": [],
+      "started_at": "2026-10-14T03:07:46.420156+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 1,
+      "output": {
+        "query": "显热热负荷计算 混合衡算 稳态质量守恒",
+        "hits": [
+          {
+            "doc_id": "01_sensible_heat",
+            "chunk_id": "01_sensible_heat:9ea487a0e7",
+            "title": "显热热负荷计算",
+            "text": "# 显热热负荷计算\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。",
+            "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+            "score": 0.325014
+          },
+          {
+            "doc_id": "01_sensible_heat",
+            "chunk_id": "01_sensible_heat:0ad13ea9b8",
+            "title": "显热热负荷计算",
+            "text": "# 显热热负荷计算\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+            "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+            "score": 0.317166
+          },
+          {
+            "doc_id": "08_total_mass_balance",
+            "chunk_id": "08_total_mass_balance:54f94545ed",
+            "title": "稳态总质量守恒",
+            "text": "# 稳态总质量守恒\n## 总量衡算\n质量衡算的一般形式为积累速率 = 总质量流入速率 − 总质量流出速率。在稳态、无泄漏、流股完整的混合设备中，积累为零，因此出口总质量流量 F_out = Σ F_in。\n两股物流混合时 F_out = F_1 + F_2。所有 F 必须使用同一种质量流量单位，例如 kg/h，流量应非负。\n化学反应不会产生或消灭总质量，但会改变组分量；本系统的简单混合计算另外要求无反应、无相间分离。",
+            "source": "项目自编教学说明，非实测物性数据；依据质量守恒定义。",
+            "score": 0.159748
+          }
+        ],
+        "status": "ok",
+        "retrieval": {
+          "query": "显热热负荷计算 混合衡算 稳态质量守恒",
+          "mode": "lexical",
+          "keywords": {
+            "high_level": [],
+            "low_level": []
+          },
+          "entities": [],
+          "relationships": [],
+          "chunks": [
+            {
+              "chunk_id": "01_sensible_heat:9ea487a0e7",
+              "title": "显热热负荷计算",
+              "text": "# 显热热负荷计算\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "doc_id": "01_sensible_heat"
+            },
+            {
+              "chunk_id": "01_sensible_heat:0ad13ea9b8",
+              "title": "显热热负荷计算",
+              "text": "# 显热热负荷计算\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "doc_id": "01_sensible_heat"
+            },
+            {
+              "chunk_id": "08_total_mass_balance:54f94545ed",
+              "title": "稳态总质量守恒",
+              "text": "# 稳态总质量守恒\n## 总量衡算\n质量衡算的一般形式为积累速率 = 总质量流入速率 − 总质量流出速率。在稳态、无泄漏、流股完整的混合设备中，积累为零，因此出口总质量流量 F_out = Σ F_in。\n两股物流混合时 F_out = F_1 + F_2。所有 F 必须使用同一种质量流量单位，例如 kg/h，流量应非负。\n化学反应不会产生或消灭总质量，但会改变组分量；本系统的简单混合计算另外要求无反应、无相间分离。",
+              "source": "项目自编教学说明，非实测物性数据；依据质量守恒定义。",
+              "doc_id": "08_total_mass_balance"
+            }
+          ],
+          "references": [
+            {
+              "chunk_id": "01_sensible_heat:9ea487a0e7",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "url": ""
+            },
+            {
+              "chunk_id": "01_sensible_heat:0ad13ea9b8",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "url": ""
+            },
+            {
+              "chunk_id": "08_total_mass_balance:54f94545ed",
+              "source": "项目自编教学说明，非实测物性数据；依据质量守恒定义。",
+              "url": ""
+            }
+          ],
+          "graph_sources": [],
+          "metadata": {
+            "backend": "lexical",
+            "fallback_reason": "missing",
+            "truncated": false
+          }
+        }
+      },
+      "finished_at": "2026-10-14T03:07:46.424163+00:00",
+      "latency_ms": 3.437
+    },
+    {
+      "call_id": "call_2",
+      "step_id": "s2",
+      "tool_name": "calc_mass_balance",
+      "requested_arguments": {
+        "streams": [
+          {
+            "flow_kg_h": 100,
+            "mass_fraction": 0.05
+          },
+          {
+            "flow_kg_h": 400,
+            "mass_fraction": 0
+          }
+        ]
+      },
+      "arguments": {
+        "streams": [
+          {
+            "flow_kg_h": 100,
+            "mass_fraction": 0.05
+          },
+          {
+            "flow_kg_h": 400,
+            "mass_fraction": 0
+          }
+        ]
+      },
+      "input_refs": [],
+      "started_at": "2026-10-14T03:07:46.429156+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 2,
+      "output": {
+        "total_flow_kg_h": 500.0,
+        "component_flow_kg_h": 5.0,
+        "mass_fraction": 0.01,
+        "assumptions": [
+          "稳态、完全混合；无反应、无泄漏、无积累",
+          "所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1",
+          "所有输入及输出质量流量单位为 kg/h"
+        ]
+      },
+      "finished_at": "2026-10-14T03:07:46.432159+00:00",
+      "latency_ms": 3.762
+    },
+    {
+      "call_id": "call_3",
+      "step_id": "s3",
+      "tool_name": "convert_units",
+      "requested_arguments": {
+        "value": {
+          "$ref": "s2.total_flow_kg_h"
+        },
+        "from_unit": "kg/h",
+        "to_unit": "kg/s"
+      },
+      "arguments": {
+        "value": 500.0,
+        "from_unit": "kg/h",
+        "to_unit": "kg/s"
+      },
+      "input_refs": [
+        {
+          "argument": "value",
+          "ref": "s2.total_flow_kg_h",
+          "value": 500.0,
+          "source_value": 500.0,
+          "source_unit": "kg/h",
+          "unit": "kg/h"
+        }
+      ],
+      "started_at": "2026-10-14T03:07:46.438158+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 3,
+      "output": {
+        "value": 0.1388888888888889,
+        "unit": "kg/s",
+        "from_value": 500.0,
+        "from_unit": "kg/h"
+      },
+      "finished_at": "2026-10-14T03:07:46.442156+00:00",
+      "latency_ms": 4.177
+    },
+    {
+      "call_id": "call_4",
+      "step_id": "s4",
+      "tool_name": "calc_heat_duty",
+      "requested_arguments": {
+        "mass_flow_kg_s": {
+          "$ref": "s3.value"
+        },
+        "specific_heat_kj_kg_k": 4.18,
+        "delta_t_k": 40
+      },
+      "arguments": {
+        "mass_flow_kg_s": 0.1388888888888889,
+        "specific_heat_kj_kg_k": 4.18,
+        "delta_t_k": 40
+      },
+      "input_refs": [
+        {
+          "argument": "mass_flow_kg_s",
+          "ref": "s3.value",
+          "value": 0.1388888888888889,
+          "source_value": 0.1388888888888889,
+          "source_unit": "kg/s",
+          "unit": "kg/s"
+        }
+      ],
+      "started_at": "2026-10-14T03:07:46.448176+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 4,
+      "input_provenance": [
+        {
+          "argument": "specific_heat_kj_kg_k",
+          "source": "user",
+          "user_message_index": 0,
+          "value": 4.18,
+          "unit": "kJ/(kg·K)"
+        }
+      ],
+      "output": {
+        "heat_duty_kw": 23.22222222222222,
+        "inputs": {
+          "mass_flow_kg_s": 0.1388888888888889,
+          "specific_heat_kj_kg_k": 4.18,
+          "delta_t_k": 40.0
+        },
+        "assumptions": [
+          "单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差",
+          "无化学反应、无相变；忽略热损失、轴功以及动能、位能变化",
+          "比热需明确给定且适用于该温度区间，不由知识卡代填物性",
+          "正值表示加热，负值表示冷却；结果单位为 kW"
+        ]
+      },
+      "finished_at": "2026-10-14T03:07:46.452176+00:00",
+      "latency_ms": 3.783
+    }
+  ],
+  "tool_batches": [
+    {
+      "batch_id": "batch_1",
+      "agent_step": 1,
+      "model_request_index": 1,
+      "tool_names": [
+        "set_plan"
+      ],
+      "status": "succeeded",
+      "call_ids": [],
+      "started_at": "2026-10-14T03:07:46.407157+00:00",
+      "execution_mode": "ordered",
+      "finished_at": "2026-10-14T03:07:46.413158+00:00",
+      "latency_ms": 5.686
+    },
+    {
+      "batch_id": "batch_2",
+      "agent_step": 2,
+      "model_request_index": 2,
+      "tool_names": [
+        "search_knowledge",
+        "calc_mass_balance",
+        "convert_units",
+        "calc_heat_duty"
+      ],
+      "status": "succeeded",
+      "call_ids": [
+        "call_1",
+        "call_2",
+        "call_3",
+        "call_4"
+      ],
+      "started_at": "2026-10-14T03:07:46.418156+00:00",
+      "execution_mode": "ordered",
+      "finished_at": "2026-10-14T03:07:46.457867+00:00",
+      "latency_ms": 39.373
+    },
+    {
+      "batch_id": "batch_3",
+      "agent_step": 3,
+      "model_request_index": 3,
+      "tool_names": [
+        "final_answer"
+      ],
+      "status": "succeeded",
+      "call_ids": [],
+      "started_at": "2026-10-14T03:07:46.467571+00:00",
+      "execution_mode": "ordered",
+      "finished_at": "2026-10-14T03:07:46.476570+00:00",
+      "latency_ms": 9.659
+    }
+  ],
+  "evidence": [
+    {
+      "doc_id": "01_sensible_heat",
+      "chunk_id": "01_sensible_heat:9ea487a0e7",
+      "title": "显热热负荷计算",
+      "text": "# 显热热负荷计算\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。",
+      "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+      "score": 0.325014
+    },
+    {
+      "doc_id": "01_sensible_heat",
+      "chunk_id": "01_sensible_heat:0ad13ea9b8",
+      "title": "显热热负荷计算",
+      "text": "# 显热热负荷计算\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+      "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+      "score": 0.317166
+    },
+    {
+      "doc_id": "08_total_mass_balance",
+      "chunk_id": "08_total_mass_balance:54f94545ed",
+      "title": "稳态总质量守恒",
+      "text": "# 稳态总质量守恒\n## 总量衡算\n质量衡算的一般形式为积累速率 = 总质量流入速率 − 总质量流出速率。在稳态、无泄漏、流股完整的混合设备中，积累为零，因此出口总质量流量 F_out = Σ F_in。\n两股物流混合时 F_out = F_1 + F_2。所有 F 必须使用同一种质量流量单位，例如 kg/h，流量应非负。\n化学反应不会产生或消灭总质量，但会改变组分量；本系统的简单混合计算另外要求无反应、无相间分离。",
+      "source": "项目自编教学说明，非实测物性数据；依据质量守恒定义。",
+      "score": 0.159748
+    }
+  ],
+  "answer": "计算结果：\n- 混合后总流量：500 kg/h。\n- 目标组分质量流量：5 kg/h。\n- 目标组分质量分数：0.01（1%）。\n- 显热热负荷：23.2222222222 kW（加热）。\n\n计算输入与方法：\n- 单位换算：500 kg/h → 0.138888888889 kg/s。\n- 混合流股 1：100 kg/h；目标组分质量分数 0.05。\n- 混合流股 2：400 kg/h；目标组分质量分数 0。\n- 混合公式：总流量 F = ΣF_j；目标组分质量分数 w = Σ(F_j × w_j) / F。\n- 显热计算输入：质量流量 0.138888888889 kg/s；比热 4.18 kJ/(kg·K)；温差 40 K。\n- 显热公式：Q = m × cp × ΔT；使用未舍入的输入计算热负荷。\n\n适用条件：\n- 稳态、完全混合；无反应、无泄漏、无积累。\n- 所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1。\n- 所有输入及输出质量流量单位为 kg/h。\n- 单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差。\n- 无化学反应、无相变；忽略热损失、轴功以及动能、位能变化。\n- 比热需明确给定且适用于该温度区间，不由知识卡代填物性。\n- 正值表示加热，负值表示冷却；结果单位为 kW。\n\n展示最多保留 12 位有效数字；计算使用工具记录中的未舍入数值。",
+  "citations": [
+    "01_sensible_heat:9ea487a0e7",
+    "01_sensible_heat:0ad13ea9b8",
+    "08_total_mass_balance:54f94545ed"
+  ],
+  "retrieval_index": {
+    "state": "missing",
+    "message": "尚未构建 LightRAG 索引，当前使用词法检索。",
+    "document_count": 0,
+    "chunk_count": 0,
+    "backend": "lexical"
+  },
+  "answer_source": "verified_tools",
+  "finished_at": "2026-10-14T03:07:46.470570+00:00",
+  "latency_ms": 82.511,
+  "context_evidence": [],
+  "model_events": [
+    {
+      "status": "succeeded",
+      "requested_at": "2026-10-14T03:07:46.405160+00:00",
+      "selected_tools": [
+        "set_plan"
+      ],
+      "finished_at": "2026-10-14T03:07:46.405160+00:00",
+      "usage": {}
+    },
+    {
+      "status": "succeeded",
+      "requested_at": "2026-10-14T03:07:46.416158+00:00",
+      "selected_tools": [
+        "search_knowledge",
+        "calc_mass_balance",
+        "convert_units",
+        "calc_heat_duty"
+      ],
+      "finished_at": "2026-10-14T03:07:46.416158+00:00",
+      "usage": {}
+    },
+    {
+      "status": "succeeded",
+      "requested_at": "2026-10-14T03:07:46.463572+00:00",
+      "selected_tools": [
+        "final_answer"
+      ],
+      "finished_at": "2026-10-14T03:07:46.463572+00:00",
+      "usage": {}
+    }
+  ]
+}

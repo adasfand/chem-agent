@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { FlaskConical, UserRound, Copy, Check, Wrench, FileDown, Braces } from '@lucide/vue'
 import type { Example, Job } from '../types/api'
-import { resultMetrics, assumptions, numberText } from '../utils/presentation'
+import { resultMetrics, assumptions, numberText, summaryNumberText } from '../utils/presentation'
 import { exportUrl } from '../services/api'
 import StatusBadge from './StatusBadge.vue'
 import MarkdownText from './MarkdownText.vue'
@@ -104,10 +104,19 @@ async function copyAnswer() {
           <div v-if="metrics.length" class="metric-grid">
             <article v-for="(metric, index) in metrics" :key="index" class="metric-card">
               <span>{{ metric.label }}</span>
+              <span v-if="metric.valueLabel" class="metric-value-label">
+                {{ metric.valueLabel }}
+              </span>
               <strong>
-                {{ numberText(metric.value) }}
+                <span>{{ summaryNumberText(metric.value) }}</span>
                 <small>{{ metric.unit }}</small>
               </strong>
+              <dl v-if="metric.details?.length" class="metric-details">
+                <div v-for="(detail, detailIndex) in metric.details" :key="detailIndex">
+                  <dt v-if="detail.label">{{ detail.label }}</dt>
+                  <dd>{{ numberText(detail.value) }} {{ detail.unit }}</dd>
+                </div>
+              </dl>
               <span class="metric-source">
                 <Wrench :size="12" />
                 工具输出 · {{ metric.step }}

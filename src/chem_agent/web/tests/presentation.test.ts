@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { assumptions, calculationInputs, resultMetrics } from '../src/utils/presentation'
+import {
+  assumptions,
+  calculationInputs,
+  resultMetrics,
+  toolAlgorithms,
+  toolLabels,
+  summaryNumberText,
+} from '../src/utils/presentation'
 import { inlineTokens, markdownBlocks } from '../src/utils/markdown'
 import type { RunResult, ToolCall } from '../src/types/api'
 
@@ -46,10 +53,18 @@ describe('observable calculation results', () => {
         }),
       ]),
     )
-    expect(metrics.map(({ value, unit }) => ({ value, unit }))).toEqual([
-      { value: 500, unit: 'kg/h' },
-      { value: 1, unit: '%' },
-      { value: 5, unit: 'kg/h' },
+    expect(metrics).toEqual([
+      {
+        label: '混合结果',
+        valueLabel: '总流量',
+        value: 500,
+        unit: 'kg/h',
+        step: 's2',
+        details: [
+          { label: '组分质量分数', value: 1, unit: '%' },
+          { label: '组分流量', value: 5, unit: 'kg/h' },
+        ],
+      },
     ])
   })
 
@@ -85,6 +100,15 @@ describe('observable calculation results', () => {
       ]),
     )
     expect(metrics.map((metric) => metric.value)).toEqual([0, -46.44])
+  })
+  it('formats compact summaries without rounding the recorded values or losing tiny results', () => {
+    const value = (500 / 3600) * 4.18 * 40
+    const metrics = resultMetrics(result([call('calc_heat_duty', { heat_duty_kw: value })]))
+    expect(summaryNumberText(metrics[0]!.value)).toBe('23.22')
+    expect(metrics[0]!.value).toBe(value)
+    expect(summaryNumberText(0)).toBe('0')
+    expect(summaryNumberText(-46.44444444444444)).toBe('-46.44')
+    expect(summaryNumberText(0.00000123456)).toBe('0.000001235')
   })
 
   it('deduplicates assumptions from successful calls only', () => {
@@ -154,6 +178,124 @@ describe('observable calculation results', () => {
     expect(calculationInputs(result([requested]))[0]!.parameters.map((item) => item.value)).toEqual(
       [0, -40],
     )
+  })
+  it('covers nine business tool titles and algorithms without treating control actions as tools', () => {
+    expect(Object.keys(toolLabels)).toHaveLength(9)
+    expect(Object.keys(toolAlgorithms)).toEqual(Object.keys(toolLabels))
+    expect(toolLabels.set_plan).toBeUndefined()
+    expect(toolAlgorithms.final_answer).toBeUndefined()
+    for (const title of Object.values(toolLabels)) expect(title).not.toMatch(/^calc_/)
+  })
+  it('renders the five new tool outputs using only their recorded numbers and units', () => {
+    const metrics = resultMetrics(
+      result([
+        call('calc_temperature_change', { delta_t_k: 40 }),
+        call('calc_volume_flow', { volume_flow_m3_h: 0.5 }),
+        call('calc_split_flow', { branch_flow_kg_h: 150, remainder_flow_kg_h: 350 }),
+        call('calc_residence_time', { residence_time_h: 2, residence_time_min: 120 }),
+        call('calc_heating_energy', { energy_kwh: 90, energy_kj: 324000 }),
+      ]),
+    )
+    expect(metrics.map(({ value, unit }) => ({ value, unit }))).toEqual([
+      { value: 40, unit: 'K' },
+      { value: 0.5, unit: 'm³/h' },
+      { value: 150, unit: 'kg/h' },
+      { value: 2, unit: 'h' },
+      { value: 90, unit: 'kWh' },
+    ])
+    expect(metrics[2]?.details).toEqual([{ label: '第二支路', value: 350, unit: 'kg/h' }])
+    expect(metrics[3]?.details).toEqual([{ label: '', value: 120, unit: 'min' }])
+    expect(metrics[4]?.details).toEqual([{ label: '', value: 324000, unit: 'kJ' }])
+  })
+  it('shows actual new-tool inputs and preserves dependency provenance while displaying ratios as percent', () => {
+    const temperature = call('calc_temperature_change', { delta_t_k: 40 })
+    temperature.arguments = { inlet_temperature_c: 25, outlet_temperature_c: 65 }
+    const volume = call('calc_volume_flow', { volume_flow_m3_h: 0.5 })
+    volume.arguments = { mass_flow_kg_h: 500, density_kg_m3: 1000 }
+    const split = call('calc_split_flow', { branch_flow_kg_h: 150 })
+    split.arguments = { total_flow_kg_h: 500, split_fraction: 0.3 }
+    split.input_provenance = [{ argument: 'split_fraction', value: 0.3, source: 'user' }]
+    const residence = call('calc_residence_time', { residence_time_h: 2 })
+    residence.arguments = { vessel_volume_m3: 1, volume_flow_m3_h: 0.5 }
+    residence.input_refs = [
+      { argument: 'volume_flow_m3_h', value: 0.5, ref: 's4.volume_flow_m3_h', unit: 'm³/h' },
+    ]
+    const energy = call('calc_heating_energy', { energy_kwh: 90 })
+    energy.arguments = { heat_duty_kw: 45, duration_h: 2 }
+    const groups = calculationInputs(result([temperature, volume, split, residence, energy]))
+    expect(
+      groups.map((group) => group.parameters.map(({ value, unit }) => ({ value, unit }))),
+    ).toEqual([
+      [
+        { value: 25, unit: '℃' },
+        { value: 65, unit: '℃' },
+      ],
+      [
+        { value: 500, unit: 'kg/h' },
+        { value: 1000, unit: 'kg/m³' },
+      ],
+      [
+        { value: 500, unit: 'kg/h' },
+        { value: 30, unit: '%' },
+      ],
+      [
+        { value: 1, unit: 'm³' },
+        { value: 0.5, unit: 'm³/h' },
+      ],
+      [
+        { value: 45, unit: 'kW' },
+        { value: 2, unit: 'h' },
+      ],
+    ])
+    expect(groups[2]?.parameters[1]?.source).toBe('用户提供（后端记录）')
+    expect(groups[3]?.parameters[1]?.source).toBe('前序结果 s4.volume_flow_m3_h')
+  })
+  it('does not calculate missing outputs locally or promote failed new-tool records', () => {
+    const energy = call('calc_heating_energy', {})
+    energy.arguments = { heat_duty_kw: 45, duration_h: 2 }
+    const badVolume = call('calc_volume_flow', { volume_flow_m3_h: 0.5 }, 'failed')
+    expect(resultMetrics(result([energy, badVolume]))).toEqual([])
+    expect(
+      resultMetrics(
+        result([
+          call('calc_heating_energy', { energy_kwh: '90', energy_kj: Number.POSITIVE_INFINITY }),
+        ]),
+      ),
+    ).toEqual([])
+    expect(
+      resultMetrics(
+        result([
+          call('calc_temperature_change', { delta_t_k: -40 }),
+          call('calc_split_flow', { branch_flow_kg_h: 0, remainder_flow_kg_h: 500 }),
+        ]),
+      ).map((metric) => metric.value),
+    ).toEqual([-40, 0])
+  })
+  it('keeps distinct calls separate even when their output numbers are equal', () => {
+    const first = call('calc_residence_time', { residence_time_h: 2, residence_time_min: 120 })
+    const second = { ...first, call_id: 'another-call', step_id: 's3' }
+    const failed = { ...first, call_id: 'failed-call', status: 'failed' as const }
+    const metrics = resultMetrics(result([first, second, failed]))
+    expect(metrics).toHaveLength(2)
+    expect(metrics.map((metric) => metric.step)).toEqual(['s2', 's3'])
+    expect(metrics.every((metric) => metric.details?.[0]?.value === 120)).toBe(true)
+  })
+  it('retains available units and branch identities in incomplete older records', () => {
+    const metrics = resultMetrics(
+      result([
+        call('calc_residence_time', { residence_time_h: Number.NaN, residence_time_min: 120 }),
+        call('calc_heating_energy', { energy_kj: -167200 }),
+        call('calc_split_flow', { branch_flow_kg_h: '0', remainder_flow_kg_h: 500 }),
+        call('calc_mass_balance', { mass_fraction: 0 }),
+      ]),
+    )
+    expect(metrics.map(({ value, unit, valueLabel }) => ({ value, unit, valueLabel }))).toEqual([
+      { value: 120, unit: 'min', valueLabel: undefined },
+      { value: -167200, unit: 'kJ', valueLabel: undefined },
+      { value: 500, unit: 'kg/h', valueLabel: '第二支路' },
+      { value: 0, unit: '%', valueLabel: '组分质量分数' },
+    ])
+    expect(metrics.every((metric) => metric.details === undefined)).toBe(true)
   })
 })
 

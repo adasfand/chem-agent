@@ -14,6 +14,50 @@ _CAPACITY = re.compile(
 )
 
 
+def supplied_density(value: float, user_inputs: list[str]) -> dict:
+    """Match a unique, latest explicit density; teaching values are not inputs."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError("密度需要是有限数值。")
+    pattern = re.compile(
+        rf"(?P<value>{_NUMBER})\s*(?P<unit>kg\s*/\s*m3|g\s*/\s*cm3|千克\s*/\s*立方米)(?!(?:\s*[/·⋅*×]|[a-z0-9]))"
+    )
+    for index in range(len(user_inputs) - 1, -1, -1):
+        text = unicodedata.normalize("NFKC", user_inputs[index]).casefold()
+        if not re.search(r"密度|density|ρ", text):
+            continue
+        if re.search(
+            r"(?:密度|density|ρ)[^。；\n]{0,16}(?:未知|未给|不确定|撤回|不要使用)|(?:撤回|不使用|不要使用)[^。；\n]{0,8}密度",
+            text,
+        ):
+            break
+        candidates = []
+        for match in pattern.finditer(text):
+            prefix = re.split(r"[。；\n]", text[: match.start()])[-1]
+            if not re.search(r"密度|density|ρ", prefix) or re.search(
+                r"不是|仅.*(?:示例|算例)|不采用|不使用", prefix
+            ):
+                continue
+            number = float(match["value"])
+            if match["unit"].replace(" ", "").startswith("g/"):
+                number *= 1000
+            if math.isfinite(number) and number > 0:
+                candidates.append(number)
+        if len(set(candidates)) == 1 and math.isclose(
+            value, candidates[0], rel_tol=1e-9, abs_tol=1e-12
+        ):
+            return {
+                "argument": "density_kg_m3",
+                "source": "user",
+                "user_message_index": index,
+                "value": candidates[0],
+                "unit": "kg/m3",
+            }
+        break
+    raise ValueError(
+        "密度未匹配用户明确给出的数值与单位，请以needs_input请求补充工况密度；支持kg/m3或g/cm3。"
+    )
+
+
 def supplied_specific_heat(value: float, user_inputs: list[str]) -> dict:
     """Match the latest supplied capacity, never retrieval or assistant text.
 

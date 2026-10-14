@@ -54,6 +54,9 @@ _UNIT_GROUPS: dict[str, dict[str, str]] = {
         "atm": "atmosphere",
         "psi": "psi",
     },
+    "power": {"W": "watt", "kW": "kilowatt"},
+    "energy": {"J": "joule", "kJ": "kilojoule", "kWh": "kilowatt_hour"},
+    "time": {"s": "second", "min": "minute", "h": "hour"},
     "temperature": {
         "K": "kelvin",
         "degC": "degC",

@@ -19,6 +19,7 @@ from chem_agent.retrieval import HybridRetriever
 from chem_agent.validation import CASE_TITLES, source_identity
 
 ROOT = Path(__file__).resolve().parents[1]
+# Legacy traces predate ordered batches; retain their historical error marker.
 _BATCH_ERROR = "每次回复只允许调用一个工具"
 _FINAL_ERROR = "Error executing tool 'final_answer'"
 _HEAT_CONDITIONS = {
@@ -329,8 +330,23 @@ def recovery_summary(result: dict) -> dict:
             default=0,
         )
 
-    blocked = maximum_history_count(_BATCH_ERROR)
-    failed_final = maximum_history_count(_FINAL_ERROR)
+    if "tool_batches" in result:
+        batches = result["tool_batches"]
+        blocked = sum(
+            batch["status"] == "failed"
+            and not batch["call_ids"]
+            and batch["tool_names"] != ["final_answer"]
+            for batch in batches
+        )
+        failed_final = sum(
+            batch["status"] == "failed" and batch["tool_names"] == ["final_answer"]
+            for batch in batches
+        )
+        count_source = "actual ordered batch records and business tool records"
+    else:
+        blocked = maximum_history_count(_BATCH_ERROR)
+        failed_final = maximum_history_count(_FINAL_ERROR)
+        count_source = "tool records and errors observed in subsequent model requests"
     failed_calls = [call for call in result["calls"] if call["status"] == "failed"]
     attempts = blocked + failed_final + len(failed_calls)
     return {
@@ -338,7 +354,7 @@ def recovery_summary(result: dict) -> dict:
         "failed_tool_calls": len(failed_calls),
         "failed_final_answers": failed_final,
         "recovered": bool(attempts and result["status"] == "completed"),
-        "count_source": "tool records and errors observed in subsequent model requests",
+        "count_source": count_source,
     }
 
 

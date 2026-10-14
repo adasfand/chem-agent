@@ -5,6 +5,7 @@ import type { ToolRegistry, RegisteredTool, ManualToolResult } from '../types/ap
 import { toolRegistryApi } from '../services/api'
 import { durationText, parseToolArguments } from '../utils/audit'
 import StatusBadge from './StatusBadge.vue'
+import { toolAlgorithms } from '../utils/presentation'
 
 const dialog = ref<HTMLDialogElement>()
 const registry = shallowRef<ToolRegistry | null>(null)
@@ -15,7 +16,11 @@ const calling = ref(false)
 const error = ref('')
 const result = shallowRef<ManualToolResult | null>(null)
 const records = shallowRef<ManualToolResult[]>([])
-const tools = computed(() => registry.value?.tools ?? [])
+const tools = computed(() =>
+  (registry.value?.tools ?? []).filter(
+    (tool) => tool.source !== 'agent' || !['set_plan', 'final_answer'].includes(tool.name),
+  ),
+)
 const json = (value: unknown) => JSON.stringify(value ?? {}, null, 2)
 function select(tool: RegisteredTool) {
   if (calling.value) return
@@ -106,7 +111,10 @@ defineExpose({ open })
     <div class="registry-layout">
       <nav class="registry-catalog" aria-label="已注册工具">
         <template v-for="source in ['agent', 'mcp']" :key="source">
-          <h3>{{ source === 'agent' ? 'Agent 业务工具' : 'MCP 辅助工具' }}</h3>
+          <h3>
+            {{ source === 'agent' ? 'Agent 业务工具' : 'MCP 辅助工具' }} ·
+            {{ tools.filter((tool) => tool.source === source).length }}
+          </h3>
           <button
             v-for="tool in tools.filter((item) => item.source === source)"
             :key="tool.name"
@@ -117,6 +125,12 @@ defineExpose({ open })
           >
             <strong>{{ tool.title }}</strong>
             <small>{{ tool.invocation === 'model' ? '由模型按计划调用' : '支持手动试用' }}</small>
+            <small
+              v-if="tool.capability_kind === 'engineering_example'"
+              class="registry-example-label"
+            >
+              教学计算示例
+            </small>
           </button>
         </template>
       </nav>
@@ -126,6 +140,10 @@ defineExpose({ open })
           <span>{{ selected.source === 'mcp' ? 'MCP' : 'Agent' }}</span>
         </div>
         <p>{{ selected.description }}</p>
+        <section v-if="selected.algorithm || toolAlgorithms[selected.name]" class="registry-method">
+          <h4>计算与处理方法</h4>
+          <p>{{ selected.algorithm || toolAlgorithms[selected.name] }}</p>
+        </section>
         <template v-if="selected.source === 'mcp'">
           <p class="registry-note">此处为手动试用，结果保留在工具面板中。</p>
           <label for="mcp-arguments">输入参数（JSON）</label>
@@ -163,12 +181,19 @@ defineExpose({ open })
           </section>
         </template>
         <template v-else>
+          <p v-if="selected.capability_kind === 'engineering_example'" class="registry-note">
+            教学计算示例工具已实现并接入执行流程；实际计算以问题条件、工具适用前提及返回值为准。
+          </p>
           <p class="registry-note">
             在问答中描述任务及已知条件，模型会登记计划并选择业务工具。执行审计展示实际调用和参数来源。
           </p>
           <details v-if="selected.input_schema" class="registry-schema">
             <summary>查看业务工具参数规范</summary>
             <pre>{{ json(selected.input_schema) }}</pre>
+          </details>
+          <details v-if="selected.example" class="registry-schema registry-example-inputs">
+            <summary>查看示例入参（JSON）</summary>
+            <pre>{{ json(selected.example) }}</pre>
           </details>
         </template>
       </section>

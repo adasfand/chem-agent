@@ -1,0 +1,1103 @@
+{
+  "schema_version": 1,
+  "run_id": "20261014T141404-dd706bd482",
+  "mode": "live",
+  "started_at": "2026-10-14T14:14:04.104524+00:00",
+  "question": "将100 kg/h、含盐5%的溶液与400 kg/h纯水混合，整股混合液从25℃加热到65℃。给定比热4.18 kJ/(kg·K)、密度1000 kg/m³、分流前罐体有效持液体积1 m³，随后按30%/70%分流，加热持续2 h。要求计算组成、流量、温差、停留时间、热负荷及传热量，并说明依据和适用条件。",
+  "knowledge_version": "e412b3d7c9e1608c5925befd47f06163b4aaf7d4b49e93032c8b01853f558873",
+  "status": "completed",
+  "plan": [
+    {
+      "step_id": "s1",
+      "goal": "检索混合衡算、显热公式及适用条件",
+      "tool_name": "search_knowledge",
+      "depends_on": [],
+      "status": "succeeded",
+      "algorithm": "图谱与向量混合检索 / 字符TF-IDF"
+    },
+    {
+      "step_id": "s2",
+      "goal": "混合衡算：100 kg/h 5%盐水与400 kg/h纯水",
+      "tool_name": "calc_mass_balance",
+      "depends_on": [
+        "s1"
+      ],
+      "status": "succeeded",
+      "algorithm": "总质量守恒与组分质量加权求和"
+    },
+    {
+      "step_id": "s3",
+      "goal": "计算25℃到65℃温差",
+      "tool_name": "calc_temperature_change",
+      "depends_on": [
+        "s1"
+      ],
+      "status": "succeeded",
+      "algorithm": "ΔT = T_out − T_in"
+    },
+    {
+      "step_id": "s4",
+      "goal": "混合总流量换算为kg/s",
+      "tool_name": "convert_units",
+      "depends_on": [
+        "s2"
+      ],
+      "status": "succeeded",
+      "algorithm": "量纲校验与单位归一化"
+    },
+    {
+      "step_id": "s5",
+      "goal": "显热负荷计算",
+      "tool_name": "calc_heat_duty",
+      "depends_on": [
+        "s1",
+        "s3",
+        "s4"
+      ],
+      "status": "succeeded",
+      "algorithm": "单相恒比热显热衡算 Q = m × cp × ΔT"
+    },
+    {
+      "step_id": "s6",
+      "goal": "按密度计算体积流量",
+      "tool_name": "calc_volume_flow",
+      "depends_on": [
+        "s2"
+      ],
+      "status": "succeeded",
+      "algorithm": "V̇ = ṁ / ρ"
+    },
+    {
+      "step_id": "s7",
+      "goal": "名义停留时间",
+      "tool_name": "calc_residence_time",
+      "depends_on": [
+        "s6"
+      ],
+      "status": "succeeded",
+      "algorithm": "τ = V / V̇"
+    },
+    {
+      "step_id": "s8",
+      "goal": "30%/70%分流",
+      "tool_name": "calc_split_flow",
+      "depends_on": [
+        "s2"
+      ],
+      "status": "succeeded",
+      "algorithm": "F_branch = F_total × α; F_remainder = F_total − F_branch"
+    },
+    {
+      "step_id": "s9",
+      "goal": "2h传热量",
+      "tool_name": "calc_heating_energy",
+      "depends_on": [
+        "s5"
+      ],
+      "status": "succeeded",
+      "algorithm": "E_kWh = Q_kW × t_h; E_kJ = 3600 × E_kWh"
+    }
+  ],
+  "calls": [
+    {
+      "call_id": "call_1",
+      "step_id": "s1",
+      "tool_name": "search_knowledge",
+      "requested_arguments": {
+        "query": "混合衡算 显热公式 Q=mcpΔT 适用条件 稳态无反应",
+        "top_k": 3
+      },
+      "arguments": {
+        "query": "混合衡算 显热公式 Q=mcpΔT 适用条件 稳态无反应",
+        "top_k": 3
+      },
+      "input_refs": [],
+      "started_at": "2026-10-14T14:14:09.731908+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 1,
+      "output": {
+        "query": "混合衡算 显热公式 Q=mcpΔT 适用条件 稳态无反应",
+        "hits": [
+          {
+            "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+            "title": "显热热负荷计算",
+            "text": "# 显热热负荷计算\n来源：项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。\n\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。\n\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+            "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+            "doc_id": "01_sensible_heat"
+          },
+          {
+            "chunk_id": "doc-932ed8a134107dcf2693c301-chunk-000",
+            "title": "计算结果的合理性检查",
+            "text": "# 计算结果的合理性检查\n来源：项目自编教学说明，非实测物性数据；项目教学计算核验约定。\n\n## 量纲与守恒\n热负荷结果应同时给出数值、功率单位、输入量和假设。流量、比热容为正时，热负荷符号应与温差一致；流量或温差翻倍时，定比热简化热负荷也翻倍。\n混合衡算应检查总质量流入等于流出、目标组分流入等于流出，出口质量分数位于入口最小值与最大值之间。两股同浓度物流混合后浓度不变。\n中间步骤保留精度，仅在展示时四舍五入。显示 46.44 kW 不意味着所有输入具有四位有效数字。记录教学算例与实际工程测量的区别。",
+            "source": "项目自编教学说明，非实测物性数据；项目教学计算核验约定。",
+            "doc_id": "14_result_checks"
+          },
+          {
+            "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+            "title": "复合单位的括号与乘除顺序",
+            "text": "# 复合单位的括号与乘除顺序\n来源：项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html\n\n## 清楚写出分母\n质量比热容写为 J/(kg·K) 或 J·kg⁻¹·K⁻¹，避免连续斜杠造成歧义。热负荷量纲检验为 (kg/s) × (kJ/(kg·K)) × K = kJ/s = kW；相同单位应成对消去。\n\n## 错误防范\nkg·K/J 是比热容的倒数，不能与 J/(kg·K) 互换。录入数据前先检查括号及量纲，再处理数值；即使数值看似合理，错误的物理量仍会产生错误结果。单位格式建议不表示输入解析器接受所有写法。",
+            "source": "项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html",
+            "doc_id": "25_compound_unit_notation"
+          }
+        ],
+        "status": "ok",
+        "retrieval": {
+          "query": "混合衡算 显热公式 Q=mcpΔT 适用条件 稳态无反应",
+          "mode": "mix",
+          "keywords": {
+            "high_level": [
+              "混合衡算",
+              "显热公式",
+              "适用条件"
+            ],
+            "low_level": [
+              "Q=mcpΔT",
+              "稳态无反应"
+            ]
+          },
+          "entities": [
+            {
+              "id": "稳态无反应条件",
+              "name": "稳态无反应条件",
+              "type": "concept",
+              "description": "稳态无反应、无组分外部补加是回收率取值0 ≤ η_i ≤ 1的前提条件。",
+              "source_ids": [
+                "doc-f42596fd45c83be791902af9-chunk-000"
+              ]
+            },
+            {
+              "id": "液相显热",
+              "name": "液相显热",
+              "type": "concept",
+              "description": "液体在未发生相变时因温度升高而吸收的热量，计算时采用液相的热容。",
+              "source_ids": [
+                "doc-3c5b5ab52c44954f0471ddd4-chunk-000"
+              ]
+            },
+            {
+              "id": "稳态无反应系统",
+              "name": "稳态无反应系统",
+              "type": "concept",
+              "description": "含N个组分且处于稳态、无化学反应发生的系统，可写出N个组分质量衡算方程。",
+              "source_ids": [
+                "doc-b610cdaea4a56b75fcbdac1e-chunk-000"
+              ]
+            },
+            {
+              "id": "热容",
+              "name": "热容",
+              "type": "data",
+              "description": "热容是描述整个系统在温度变化时吸收或释放热量能力的物理量，符号为C，单位为J/K。<SEP>物质温度升高单位温度所需吸收的热量，不同相态下具有不同的热容值。",
+              "source_ids": [
+                "doc-fe5743266e6950ede9231201-chunk-000",
+                "doc-3c5b5ab52c44954f0471ddd4-chunk-000"
+              ]
+            },
+            {
+              "id": "稳态无反应分离器",
+              "name": "稳态无反应分离器",
+              "type": "concept",
+              "description": "在稳态且无化学反应条件下运行的分离器，满足总流量衡算F = P + R及各组分衡算Fw_F,i = Pw_P,i + Rw_R,i。",
+              "source_ids": [
+                "doc-6ef9a702e3656e53950cff04-chunk-000"
+              ]
+            },
+            {
+              "id": "气相显热",
+              "name": "气相显热",
+              "type": "concept",
+              "description": "气体在未发生相变时因温度升高而吸收的热量，计算时采用气相的热容。",
+              "source_ids": [
+                "doc-3c5b5ab52c44954f0471ddd4-chunk-000"
+              ]
+            },
+            {
+              "id": "显热公式",
+              "name": "显热公式",
+              "type": "method",
+              "description": "显热公式为Q_dot = m_dot × cp × ΔT，用于计算显热，其中cp必须为正且适用温度区间应合理。<SEP>显热公式是用于计算显热的热力学公式，其中的c_p必须对应实际物质、相态、温度范围和质量基准。",
+              "source_ids": [
+                "doc-78a5c08ab98d68af7e60add9-chunk-000",
+                "doc-fe5743266e6950ede9231201-chunk-000"
+              ]
+            },
+            {
+              "id": "质量比热容",
+              "name": "质量比热容",
+              "type": "data",
+              "description": "质量比热容是单位质量物质在特定条件下温度升高1开尔文所需的热量，属于IUPAC定义的热物性参数。其符号通常表示为c或c_p，单位为J/(kg·K)或kJ/(kg·K)，推荐写作J/(kg·K)或J·kg⁻¹·K⁻¹，以避免连续斜杠造成歧义。质量比热容由热容除以质量得到，表示单位质量物质在温度变化时吸收或释放的热量。它可由标准定压摩尔热容结合摩尔质量换算得到，但与标准态摩尔热容不同，不能用于替代Shomate公式中的标准态摩尔热容。在热力学中，按单位质量计的热容区分为定压质量比热容与定容质量比热容，二者之差等于R/M（其中R为通用气体常数，M为摩尔质量）。质量比热容是热负荷计算所需的重要输入参数之一。",
+              "source_ids": [
+                "doc-116bb62b4479acd77b00e291-chunk-000",
+                "doc-1e0f6617b86e4188034a9b1f-chunk-000",
+                "doc-2851839168b3a633784df100-chunk-000",
+                "doc-6c9d8f17c19a442ac80afa89-chunk-000",
+                "doc-9d74e039ac796952f5b66af1-chunk-000",
+                "doc-cdd3506e3ae3fe19d1134c1c-chunk-000",
+                "doc-fe5743266e6950ede9231201-chunk-000",
+                "doc-d918bcf99286ff92fdaf5e68-chunk-000"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "id": "rel-497ce2ef3f3d33fa",
+              "source": "稳态无反应系统",
+              "target": "组分衡算",
+              "description": "组分衡算适用于含N个组分的稳态无反应系统。",
+              "keywords": "适用对象",
+              "source_ids": [
+                "doc-b610cdaea4a56b75fcbdac1e-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-6eab38374e502c72",
+              "source": "液相显热",
+              "target": "热容",
+              "description": "液相显热的计算采用液相的热容作为物性参数。",
+              "keywords": "计算依据,采用",
+              "source_ids": [
+                "doc-3c5b5ab52c44954f0471ddd4-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-330ef56f1d18f3ef",
+              "source": "稳态无反应条件",
+              "target": "组分回收率",
+              "description": "在稳态无反应、无组分外部补加条件下，组分回收率的取值范围为0到1。",
+              "keywords": "约束条件",
+              "source_ids": [
+                "doc-f42596fd45c83be791902af9-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-2c08c14cf2c9e305",
+              "source": "气相显热",
+              "target": "热容",
+              "description": "气相显热的计算采用气相的热容作为物性参数。",
+              "keywords": "计算依据,采用",
+              "source_ids": [
+                "doc-3c5b5ab52c44954f0471ddd4-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-324a444ab4417d1c",
+              "source": "分流器",
+              "target": "稳态无反应分离器",
+              "description": "稳态无反应分离器的衡算关系可用于描述分流器的物料衡算。",
+              "keywords": "衡算模型,适用",
+              "source_ids": [
+                "doc-6ef9a702e3656e53950cff04-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-8ed2d98216107ecd",
+              "source": "显热公式",
+              "target": "质量比热容",
+              "description": "显热公式中的c_p必须对应实际物质、相态、温度范围和质量基准。",
+              "keywords": "使用条件,参数要求",
+              "source_ids": [
+                "doc-fe5743266e6950ede9231201-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-86f9c90ec94c155e",
+              "source": "稳态无反应分离器",
+              "target": "选择性分离器",
+              "description": "稳态无反应分离器的衡算关系可用于描述选择性分离器的物料衡算。",
+              "keywords": "衡算模型,适用",
+              "source_ids": [
+                "doc-6ef9a702e3656e53950cff04-chunk-000"
+              ]
+            },
+            {
+              "id": "rel-e3a76c285a5210a8",
+              "source": "稳态无反应系统",
+              "target": "质量分数约束",
+              "description": "稳态无反应系统中每股物流的未知组成受Σw_i = 1约束。",
+              "keywords": "约束条件",
+              "source_ids": [
+                "doc-b610cdaea4a56b75fcbdac1e-chunk-000"
+              ]
+            }
+          ],
+          "chunks": [
+            {
+              "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+              "title": "显热热负荷计算",
+              "text": "# 显热热负荷计算\n来源：项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。\n\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。\n\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "doc_id": "01_sensible_heat"
+            },
+            {
+              "chunk_id": "doc-932ed8a134107dcf2693c301-chunk-000",
+              "title": "计算结果的合理性检查",
+              "text": "# 计算结果的合理性检查\n来源：项目自编教学说明，非实测物性数据；项目教学计算核验约定。\n\n## 量纲与守恒\n热负荷结果应同时给出数值、功率单位、输入量和假设。流量、比热容为正时，热负荷符号应与温差一致；流量或温差翻倍时，定比热简化热负荷也翻倍。\n混合衡算应检查总质量流入等于流出、目标组分流入等于流出，出口质量分数位于入口最小值与最大值之间。两股同浓度物流混合后浓度不变。\n中间步骤保留精度，仅在展示时四舍五入。显示 46.44 kW 不意味着所有输入具有四位有效数字。记录教学算例与实际工程测量的区别。",
+              "source": "项目自编教学说明，非实测物性数据；项目教学计算核验约定。",
+              "doc_id": "14_result_checks"
+            },
+            {
+              "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+              "title": "复合单位的括号与乘除顺序",
+              "text": "# 复合单位的括号与乘除顺序\n来源：项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html\n\n## 清楚写出分母\n质量比热容写为 J/(kg·K) 或 J·kg⁻¹·K⁻¹，避免连续斜杠造成歧义。热负荷量纲检验为 (kg/s) × (kJ/(kg·K)) × K = kJ/s = kW；相同单位应成对消去。\n\n## 错误防范\nkg·K/J 是比热容的倒数，不能与 J/(kg·K) 互换。录入数据前先检查括号及量纲，再处理数值；即使数值看似合理，错误的物理量仍会产生错误结果。单位格式建议不表示输入解析器接受所有写法。",
+              "source": "项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html",
+              "doc_id": "25_compound_unit_notation"
+            }
+          ],
+          "references": [
+            {
+              "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "url": "",
+              "reference_id": "1"
+            },
+            {
+              "chunk_id": "doc-932ed8a134107dcf2693c301-chunk-000",
+              "source": "项目自编教学说明，非实测物性数据；项目教学计算核验约定。",
+              "url": "",
+              "reference_id": "2"
+            },
+            {
+              "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+              "source": "项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html",
+              "url": "https://physics.nist.gov/cuu/Units/checklist.html",
+              "reference_id": "3"
+            }
+          ],
+          "graph_sources": [
+            {
+              "chunk_id": "doc-f42596fd45c83be791902af9-chunk-000",
+              "doc_id": "64_component_recovery",
+              "title": "组分回收率与产品质量流量",
+              "source": "项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Liquid-Liquid Extraction Material Balance：https://learncheme.com/screencasts/mass-energy-balances/；回收率为本卡明确规定的衡算定义。",
+              "url": "https://learncheme.com/screencasts/mass-energy-balances/；回收率为本卡明确规定的衡算定义",
+              "text": "# 组分回收率与产品质量流量\n来源：项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Liquid-Liquid Extraction Material Balance：https://learncheme.com/screencasts/mass-energy-balances/；回收率为本卡明确规定的衡算定义。\n\n## 定义与公式\n定义目标组分进入指定产品的质量回收率 η_i = Pw_P,i/(Fw_F,i)。若进料目标组分流量 Fw_F,i > 0，则产品中该组分流量为 η_i Fw_F,i；已知产品质量分数 w_P,i > 0 时，P = η_i Fw_F,i/w_P,i。\n\n## 条件与防错\n稳态无反应、无组分外部补加时，0 ≤ η_i ≤ 1。回收率不是产品纯度，也不是总流量的分流比例；高回收率仍可能得到低纯度产品。比较回收率应使用相同边界，循环内单程回收率与全流程回收率不能混用。"
+            },
+            {
+              "chunk_id": "doc-3c5b5ab52c44954f0471ddd4-chunk-000",
+              "doc_id": "44_sensible_latent_path_split",
+              "title": "跨相变加热应拆分计算路径",
+              "source": "项目教学整理，依据 OpenStax《Chemistry 2e》10.3 节的加热曲线；https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions",
+              "url": "https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions",
+              "text": "# 跨相变加热应拆分计算路径\n来源：项目教学整理，依据 OpenStax《Chemistry 2e》10.3 节的加热曲线；https://openstax.org/books/chemistry-2e/pages/10-3-phase-transitions\n\n## 各段分别计入\n定压下，从液体升温至完全汽化后再升温，可分为液相显热、汽化相变热、气相显热：Q = Q_liquid + Q_vap + Q_gas。每个显热段采用该相的热容，相变段采用对应压力下的相变焓。\n\n## 适用条件\n须明确初末相态、压力、是否全部转化及物性适用区间；不能用一个平均比热覆盖潜热。部分汽化还需要汽化质量或干度。该路径说明用于判断数据是否齐全，不表示当前显热工具能完成全路径计算。"
+            },
+            {
+              "chunk_id": "doc-b610cdaea4a56b75fcbdac1e-chunk-000",
+              "doc_id": "69_independent_balances",
+              "title": "组分衡算与总量衡算的方程独立性",
+              "source": "项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Introduction to Degrees of Freedom：https://learncheme.com/screencasts/mass-energy-balances/；独立性解释由组分质量加和推导。",
+              "url": "https://learncheme.com/screencasts/mass-energy-balances/；独立性解释由组分质量加和推导",
+              "text": "# 组分衡算与总量衡算的方程独立性\n来源：项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Introduction to Degrees of Freedom：https://learncheme.com/screencasts/mass-energy-balances/；独立性解释由组分质量加和推导。\n\n## 独立方程\n含 N 个组分的稳态无反应系统，可写 N 个组分质量衡算；将它们相加即得到总质量衡算。因而总量加上全部 N 个组分衡算并不是 N+1 个独立方程。也可使用总量与 N-1 个组分衡算。\n\n## 条件与防错\n未知组成还受每股物流 Σw_i = 1 的约束；统计未知量时应扣除相应依赖。零流量、重复组成或重复规格可能进一步降低方程秩。未知数数量与方程数量相等只是必要检查，不能保证非负可行解或唯一解。"
+            },
+            {
+              "chunk_id": "doc-fe5743266e6950ede9231201-chunk-000",
+              "doc_id": "19_iupac_heat_capacity_basis",
+              "title": "热容与质量比热容的基准",
+              "source": "IUPAC《Compendium of Chemical Terminology》（Gold Book）第 5 版在线版，条目“heat capacity”（H02753）与“specific heat capacity”（S05800）；https://goldbook.iupac.org/terms/view/H02753 ，https://goldbook.iupac.org/terms/view/S05800",
+              "url": "https://goldbook.iupac.org/terms/view/H02753",
+              "text": "# 热容与质量比热容的基准\n来源：IUPAC《Compendium of Chemical Terminology》（Gold Book）第 5 版在线版，条目“heat capacity”（H02753）与“specific heat capacity”（S05800）；https://goldbook.iupac.org/terms/view/H02753 ，https://goldbook.iupac.org/terms/view/S05800\n\n## 物理量区分\n热容 C 针对整个系统，单位 J/K；质量比热容 c 是热容除以质量，单位 J/(kg·K)。定压热容 C_p 与定容热容 C_v 的约束条件不同。给定每摩尔的热容时，其单位为 J/(mol·K)，不能直接与 kg/s 的质量流量相乘。\n\n## 适用边界\n显热公式中的 c_p 必须对应实际物质、相态、温度范围和质量基准；跨较大温区且比热明显变化时，应使用适用范围内的温度相关数据进行积分。该条目仅给出定义，不提供任意物质的比热数值。"
+            },
+            {
+              "chunk_id": "doc-6ef9a702e3656e53950cff04-chunk-000",
+              "doc_id": "60_splitter_vs_separator",
+              "title": "分流与选择性分离的衡算差异",
+              "source": "项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Analysis of a Split Point 与单元物料衡算主题：https://learncheme.com/screencasts/mass-energy-balances/；公式由守恒推导。",
+              "url": "https://learncheme.com/screencasts/mass-energy-balances/；公式由守恒推导",
+              "text": "# 分流与选择性分离的衡算差异\n来源：项目教学整理；参考美国科罗拉多大学 Boulder LearnChemE 的 Analysis of a Split Point 与单元物料衡算主题：https://learncheme.com/screencasts/mass-energy-balances/；公式由守恒推导。\n\n## 两类模型\n分流器的所有组分按同一比例进入每个出口；选择性分离器允许不同组分去不同出口。对稳态无反应分离器，有 F = P+R 及 Fw_F,i = Pw_P,i+Rw_R,i，但通常 w_P,i ≠ w_R,i。\n\n## 错误防范\n不能仅凭总流量分流比例推断分离产品纯度。求未知组成需要额外的回收率、出口组成或分离性能数据；缺少条件时衡算可能不唯一。知识库中的分离关系不意味着当前稳态混合工具已支持过滤、蒸馏或膜分离计算。"
+            },
+            {
+              "chunk_id": "doc-78a5c08ab98d68af7e60add9-chunk-000",
+              "doc_id": "06_specific_heat",
+              "title": "比热容与给定物性",
+              "source": "项目自编教学说明，非实测物性数据；依据比热容定义。",
+              "url": "",
+              "text": "# 比热容与给定物性\n来源：项目自编教学说明，非实测物性数据；依据比热容定义。\n\n## 使用质量比热容\n比热容 cp 表示单位质量物质温度升高单位温差所需的显热，常用 J/(kg·K) 或 kJ/(kg·K)。1 kJ/(kg·K) = 1000 J/(kg·K)。简化显热公式 Q_dot = m_dot × cp × ΔT 中，cp 必须为正且适用温度区间应合理。\n比热容会随物质、温度、压力和组成变化。本知识库不提供真实物性数据库；不得根据物质名称自行编造数值。题目缺少 cp 时应追问，或说明需提供可核验的物性来源。\n定比热是假设；变化明显时需物性关系并积分，不能把单个给定值当作所有工况的通用值。"
+            },
+            {
+              "chunk_id": "doc-116bb62b4479acd77b00e291-chunk-000",
+              "doc_id": "38_shomate_reduced_temperature",
+              "title": "Shomate 热容公式的缩放温度",
+              "source": "项目教学整理，依据 NIST Chemistry WebBook 水页面的 Shomate 公式；https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201",
+              "url": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201",
+              "text": "# Shomate 热容公式的缩放温度\n来源：项目教学整理，依据 NIST Chemistry WebBook 水页面的 Shomate 公式；https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201\n\n## 变量与单位\nShomate 写法 C_p,m° = A + Bt + Ct² + Dt³ + E/t²，其中 t = T(K)/1000，C_p,m° 用 J/(mol·K)。t 是缩放后的温度变量，不能直接把摄氏温度或未除以 1000 的 K 数值代入。\n\n## 错误防范\n系数、相态、温区与单位必须从同一数据表取用；标准态摩尔热容不是任意压力下的质量比热容。不可把表中焓公式的 kJ/mol 与热容的 J/(mol·K) 混为一套数值单位。当前后端没有 Shomate 求值工具。"
+            },
+            {
+              "chunk_id": "doc-1e0f6617b86e4188034a9b1f-chunk-000",
+              "doc_id": "20_nist_water_vapor_heat_capacity",
+              "title": "NIST 水蒸气定压热容数据的适用范围",
+              "source": "NIST Chemistry WebBook，SRD 69，“Water”页面的“Gas Phase Heat Capacity (Shomate Equation)”段，数据引用 Chase (1998)；https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201",
+              "url": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201",
+              "text": "# NIST 水蒸气定压热容数据的适用范围\n来源：NIST Chemistry WebBook，SRD 69，“Water”页面的“Gas Phase Heat Capacity (Shomate Equation)”段，数据引用 Chase (1998)；https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Mask=201\n\n## 数据范围\n该页面给出水在气相的标准定压摩尔热容与温度的 Shomate 关系，单位 J/(mol·K)，温度分段为 500–1700 K 和 1700–6000 K。选系数时必须使用相应温度段；要与质量流量配合计算，还需以摩尔质量换成质量比热容。\n\n## 适用边界\n这是气相水的指定温区数据，不可拿来代替常温液态水的比热，也不应外推到 500 K 以下或 6000 K 以上。相变过程还需单独处理相变焓，不能只用气相显热关系覆盖全程。"
+            },
+            {
+              "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+              "doc_id": "25_compound_unit_notation",
+              "title": "复合单位的括号与乘除顺序",
+              "source": "项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html",
+              "url": "https://physics.nist.gov/cuu/Units/checklist.html",
+              "text": "# 复合单位的括号与乘除顺序\n来源：项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html\n\n## 清楚写出分母\n质量比热容写为 J/(kg·K) 或 J·kg⁻¹·K⁻¹，避免连续斜杠造成歧义。热负荷量纲检验为 (kg/s) × (kJ/(kg·K)) × K = kJ/s = kW；相同单位应成对消去。\n\n## 错误防范\nkg·K/J 是比热容的倒数，不能与 J/(kg·K) 互换。录入数据前先检查括号及量纲，再处理数值；即使数值看似合理，错误的物理量仍会产生错误结果。单位格式建议不表示输入解析器接受所有写法。"
+            },
+            {
+              "chunk_id": "doc-6c9d8f17c19a442ac80afa89-chunk-000",
+              "doc_id": "28_molar_heat_capacity_conversion",
+              "title": "摩尔热容换成质量比热容",
+              "source": "项目教学整理，依据 IUPAC “specific heat capacity”及 OpenStax 的摩尔质量定义；https://goldbook.iupac.org/terms/view/S05800 ，https://openstax.org/books/chemistry-2e/pages/3-1-formula-mass-and-the-mole-concept",
+              "url": "https://goldbook.iupac.org/terms/view/S05800",
+              "text": "# 摩尔热容换成质量比热容\n来源：项目教学整理，依据 IUPAC “specific heat capacity”及 OpenStax 的摩尔质量定义；https://goldbook.iupac.org/terms/view/S05800 ，https://openstax.org/books/chemistry-2e/pages/3-1-formula-mass-and-the-mole-concept\n\n## 转换公式\n对于确定组成的均匀物质，质量比热容 c_p = C_p,m / M。若摩尔热容用 J/(mol·K)，摩尔质量用 kg/mol，结果为 J/(kg·K)；再除以 1000 可得 kJ/(kg·K)。两种热容必须对应相同相态与条件。\n\n## 错误防范\n不能用 g/mol 的数值直接代入上述 kg 基准式，否则会少一个 1000 因子。混合物需先明确组成与平均摩尔质量，不能使用单个组分的 M。此关系是知识说明，现有显热工具仍要求明确的质量比热容输入。"
+            },
+            {
+              "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+              "doc_id": "01_sensible_heat",
+              "title": "显热热负荷计算",
+              "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+              "url": "",
+              "text": "# 显热热负荷计算\n来源：项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。\n\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。\n\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。"
+            },
+            {
+              "chunk_id": "doc-cdd3506e3ae3fe19d1134c1c-chunk-000",
+              "doc_id": "35_volumetric_heat_capacity",
+              "title": "体积热容与质量比热容的衔接",
+              "source": "项目教学整理，依据 IUPAC 质量比热容定义作量纲推导；https://goldbook.iupac.org/terms/view/S05800",
+              "url": "https://goldbook.iupac.org/terms/view/S05800",
+              "text": "# 体积热容与质量比热容的衔接\n来源：项目教学整理，依据 IUPAC 质量比热容定义作量纲推导；https://goldbook.iupac.org/terms/view/S05800\n\n## 体积基准推导\n均匀物质的体积热容 c_vol = ρ c_p，单位 J/(m³·K)。若密度与比热容可视为常数，体积 V 的物料升温显热 Q ≈ V c_vol ΔT。这是由 m = ρV 和 Q ≈ m c_p ΔT 推导的关系。\n\n## 错误防范\nρ 与 c_p 必须对应同一相态和工况。c_vol 不是热导率，后者单位为 W/(m·K)。不同温区的密度变化明显时应重新评估体积基准。现有显热工具需要质量流率与质量比热容，不会自动完成这组物性转换。"
+            },
+            {
+              "chunk_id": "doc-d918bcf99286ff92fdaf5e68-chunk-000",
+              "doc_id": "40_ideal_gas_cp_cv",
+              "title": "理想气体定压与定容热容差",
+              "source": "项目教学整理，依据 MIT 热力学第 4 章关于热容的讨论；https://ocw.mit.edu/ans7870/16/16.unified/thermoF03/chapter_4.htm",
+              "url": "https://ocw.mit.edu/ans7870/16/16.unified/thermoF03/chapter_4.htm",
+              "text": "# 理想气体定压与定容热容差\n来源：项目教学整理，依据 MIT 热力学第 4 章关于热容的讨论；https://ocw.mit.edu/ans7870/16/16.unified/thermoF03/chapter_4.htm\n\n## 摩尔与质量基准\n理想气体满足 C_p,m − C_v,m = R；按质量计则 c_p − c_v = R/M，M 必须与 R 的物质的量单位相配。内能变化使用 c_v，焓变化使用 c_p；两者代表不同状态函数的温度变化。\n\n## 适用边界\n此关系依赖理想气体假设，不能用于所有真实气体、液体和固体。不可把摩尔气体常数直接加到质量比热容上。知道 c_p 并不等于知道任意过程的热量，还需热力学路径及功的信息。"
+            }
+          ],
+          "metadata": {
+            "backend": "lightrag",
+            "keyword_model": "deepseek-flash",
+            "keyword_step": "LightRAG 内部关键词抽取（可能命中缓存）",
+            "processing_info": {
+              "total_entities_found": 8,
+              "total_relations_found": 8,
+              "entities_after_truncation": 8,
+              "relations_after_truncation": 8,
+              "merged_chunks_count": 15,
+              "final_chunks_count": 3
+            },
+            "returned_counts": {
+              "entities": 8,
+              "relationships": 8,
+              "chunks": 3,
+              "graph_sources": 13
+            },
+            "original_counts": {
+              "entities": 8,
+              "relationships": 8,
+              "chunks": 3
+            },
+            "truncated": false
+          }
+        }
+      },
+      "finished_at": "2026-10-14T14:14:11.954459+00:00",
+      "latency_ms": 2222.876
+    },
+    {
+      "call_id": "call_2",
+      "step_id": "s2",
+      "tool_name": "calc_mass_balance",
+      "requested_arguments": {
+        "streams": [
+          {
+            "flow_kg_h": 100,
+            "mass_fraction": 0.05
+          },
+          {
+            "flow_kg_h": 400,
+            "mass_fraction": 0
+          }
+        ]
+      },
+      "arguments": {
+        "streams": [
+          {
+            "flow_kg_h": 100,
+            "mass_fraction": 0.05
+          },
+          {
+            "flow_kg_h": 400,
+            "mass_fraction": 0
+          }
+        ]
+      },
+      "input_refs": [],
+      "started_at": "2026-10-14T14:14:11.968465+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 2,
+      "output": {
+        "total_flow_kg_h": 500.0,
+        "component_flow_kg_h": 5.0,
+        "mass_fraction": 0.01,
+        "assumptions": [
+          "稳态、完全混合；无反应、无泄漏、无积累",
+          "所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1",
+          "所有输入及输出质量流量单位为 kg/h"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:11.971469+00:00",
+      "latency_ms": 3.141
+    },
+    {
+      "call_id": "call_3",
+      "step_id": "s3",
+      "tool_name": "calc_temperature_change",
+      "requested_arguments": {
+        "inlet_temperature_c": 25,
+        "outlet_temperature_c": 65
+      },
+      "arguments": {
+        "inlet_temperature_c": 25,
+        "outlet_temperature_c": 65
+      },
+      "input_refs": [],
+      "started_at": "2026-10-14T14:14:11.984459+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 3,
+      "output": {
+        "delta_t_k": 40.0,
+        "inputs": {
+          "inlet_temperature_c": 25.0,
+          "outlet_temperature_c": 65.0
+        },
+        "assumptions": [
+          "输入为摄氏温度；温差 ΔT = 出口温度 − 入口温度，结果单位 K",
+          "正值表示升温，负值表示降温；温差供下游计算使用"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:11.987465+00:00",
+      "latency_ms": 3.035
+    },
+    {
+      "call_id": "call_4",
+      "step_id": "s4",
+      "tool_name": "convert_units",
+      "requested_arguments": {
+        "value": {
+          "$ref": "s2.total_flow_kg_h"
+        },
+        "from_unit": "kg/h",
+        "to_unit": "kg/s"
+      },
+      "arguments": {
+        "value": 500.0,
+        "from_unit": "kg/h",
+        "to_unit": "kg/s"
+      },
+      "input_refs": [
+        {
+          "argument": "value",
+          "ref": "s2.total_flow_kg_h",
+          "value": 500.0,
+          "source_value": 500.0,
+          "source_unit": "kg/h",
+          "unit": "kg/h"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.000844+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 4,
+      "output": {
+        "value": 0.1388888888888889,
+        "unit": "kg/s",
+        "from_value": 500.0,
+        "from_unit": "kg/h"
+      },
+      "finished_at": "2026-10-14T14:14:12.005847+00:00",
+      "latency_ms": 4.38
+    },
+    {
+      "call_id": "call_5",
+      "step_id": "s5",
+      "tool_name": "calc_heat_duty",
+      "requested_arguments": {
+        "mass_flow_kg_s": {
+          "$ref": "s4.value"
+        },
+        "specific_heat_kj_kg_k": 4.18,
+        "delta_t_k": {
+          "$ref": "s3.delta_t_k"
+        }
+      },
+      "arguments": {
+        "mass_flow_kg_s": 0.1388888888888889,
+        "specific_heat_kj_kg_k": 4.18,
+        "delta_t_k": 40.0
+      },
+      "input_refs": [
+        {
+          "argument": "mass_flow_kg_s",
+          "ref": "s4.value",
+          "value": 0.1388888888888889,
+          "source_value": 0.1388888888888889,
+          "source_unit": "kg/s",
+          "unit": "kg/s"
+        },
+        {
+          "argument": "delta_t_k",
+          "ref": "s3.delta_t_k",
+          "value": 40.0,
+          "source_value": 40.0,
+          "source_unit": "delta_K",
+          "unit": "delta_K"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.019402+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 5,
+      "input_provenance": [
+        {
+          "argument": "specific_heat_kj_kg_k",
+          "source": "user",
+          "user_message_index": 0,
+          "value": 4.18,
+          "unit": "kJ/(kg·K)"
+        }
+      ],
+      "output": {
+        "heat_duty_kw": 23.22222222222222,
+        "inputs": {
+          "mass_flow_kg_s": 0.1388888888888889,
+          "specific_heat_kj_kg_k": 4.18,
+          "delta_t_k": 40.0
+        },
+        "assumptions": [
+          "单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差",
+          "无化学反应、无相变；忽略热损失、轴功以及动能、位能变化",
+          "比热需明确给定且适用于该温度区间，不由知识卡代填物性",
+          "正值表示加热，负值表示冷却；结果单位为 kW"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:12.024402+00:00",
+      "latency_ms": 5.585
+    },
+    {
+      "call_id": "call_6",
+      "step_id": "s6",
+      "tool_name": "calc_volume_flow",
+      "requested_arguments": {
+        "mass_flow_kg_h": {
+          "$ref": "s2.total_flow_kg_h"
+        },
+        "density_kg_m3": 1000
+      },
+      "arguments": {
+        "mass_flow_kg_h": 500.0,
+        "density_kg_m3": 1000
+      },
+      "input_refs": [
+        {
+          "argument": "mass_flow_kg_h",
+          "ref": "s2.total_flow_kg_h",
+          "value": 500.0,
+          "source_value": 500.0,
+          "source_unit": "kg/h",
+          "unit": "kg/h"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.039397+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 6,
+      "input_provenance": [
+        {
+          "argument": "density_kg_m3",
+          "source": "user",
+          "user_message_index": 0,
+          "value": 1000.0,
+          "unit": "kg/m3"
+        }
+      ],
+      "output": {
+        "volume_flow_m3_h": 0.5,
+        "inputs": {
+          "mass_flow_kg_h": 500.0,
+          "density_kg_m3": 1000.0
+        },
+        "assumptions": [
+          "体积流量 V̇ = 质量流量 / 密度，结果单位 m³/h",
+          "密度由用户或有来源的数据明确给定，并适用于当前物料与工况"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:12.044408+00:00",
+      "latency_ms": 4.551
+    },
+    {
+      "call_id": "call_7",
+      "step_id": "s7",
+      "tool_name": "calc_residence_time",
+      "requested_arguments": {
+        "vessel_volume_m3": 1,
+        "volume_flow_m3_h": {
+          "$ref": "s6.volume_flow_m3_h"
+        }
+      },
+      "arguments": {
+        "vessel_volume_m3": 1,
+        "volume_flow_m3_h": 0.5
+      },
+      "input_refs": [
+        {
+          "argument": "volume_flow_m3_h",
+          "ref": "s6.volume_flow_m3_h",
+          "value": 0.5,
+          "source_value": 0.5,
+          "source_unit": "m3/h",
+          "unit": "m3/h"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.059033+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 7,
+      "output": {
+        "residence_time_h": 2.0,
+        "residence_time_min": 120.0,
+        "inputs": {
+          "vessel_volume_m3": 1.0,
+          "volume_flow_m3_h": 0.5
+        },
+        "assumptions": [
+          "稳态、恒定体积流量；名义停留时间 τ = 有效持液体积 / 体积流量",
+          "采用用户给定的有效持液体积与当前工况体积流量，输出 h 和 min"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:12.062032+00:00",
+      "latency_ms": 3.643
+    },
+    {
+      "call_id": "call_8",
+      "step_id": "s8",
+      "tool_name": "calc_split_flow",
+      "requested_arguments": {
+        "total_flow_kg_h": {
+          "$ref": "s2.total_flow_kg_h"
+        },
+        "split_fraction": 0.3
+      },
+      "arguments": {
+        "total_flow_kg_h": 500.0,
+        "split_fraction": 0.3
+      },
+      "input_refs": [
+        {
+          "argument": "total_flow_kg_h",
+          "ref": "s2.total_flow_kg_h",
+          "value": 500.0,
+          "source_value": 500.0,
+          "source_unit": "kg/h",
+          "unit": "kg/h"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.077034+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 8,
+      "output": {
+        "branch_flow_kg_h": 150.0,
+        "remainder_flow_kg_h": 350.0,
+        "split_fraction": 0.3,
+        "inputs": {
+          "total_flow_kg_h": 500.0,
+          "split_fraction": 0.3
+        },
+        "assumptions": [
+          "稳态、无积累、无泄漏的两路分流；分支质量流量 = 总质量流量 × 分流比例",
+          "其余质量流量 = 总质量流量 − 分支质量流量；两路结果单位 kg/h",
+          "分流比例表示流量比例；均匀物料分流时各路组成保持一致"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:12.081038+00:00",
+      "latency_ms": 3.633
+    },
+    {
+      "call_id": "call_9",
+      "step_id": "s9",
+      "tool_name": "calc_heating_energy",
+      "requested_arguments": {
+        "heat_duty_kw": {
+          "$ref": "s5.heat_duty_kw"
+        },
+        "duration_h": 2
+      },
+      "arguments": {
+        "heat_duty_kw": 23.22222222222222,
+        "duration_h": 2
+      },
+      "input_refs": [
+        {
+          "argument": "heat_duty_kw",
+          "ref": "s5.heat_duty_kw",
+          "value": 23.22222222222222,
+          "source_value": 23.22222222222222,
+          "source_unit": "kW",
+          "unit": "kW"
+        }
+      ],
+      "started_at": "2026-10-14T14:14:12.096774+00:00",
+      "status": "succeeded",
+      "batch_id": "batch_2",
+      "batch_position": 9,
+      "output": {
+        "energy_kwh": 46.44444444444444,
+        "energy_kj": 167200.0,
+        "inputs": {
+          "heat_duty_kw": 23.22222222222222,
+          "duration_h": 2.0
+        },
+        "assumptions": [
+          "恒定热功率；传热量 E = 热负荷 × 持续时间，1 kWh = 3600 kJ",
+          "正值表示加热传入能量，负值表示冷却移出能量；结果保留热负荷符号",
+          "热负荷采用对应工况的给定值或已成功计算的工具结果"
+        ]
+      },
+      "finished_at": "2026-10-14T14:14:12.100768+00:00",
+      "latency_ms": 3.971
+    }
+  ],
+  "tool_batches": [
+    {
+      "batch_id": "batch_1",
+      "agent_step": 1,
+      "model_request_index": 1,
+      "tool_names": [
+        "set_plan"
+      ],
+      "status": "succeeded",
+      "call_ids": [],
+      "started_at": "2026-10-14T14:14:06.970014+00:00",
+      "execution_mode": "ordered",
+      "actions": [
+        {
+          "position": 1,
+          "tool_name": "set_plan",
+          "status": "succeeded"
+        }
+      ],
+      "finished_at": "2026-10-14T14:14:06.977022+00:00",
+      "latency_ms": 6.855
+    },
+    {
+      "batch_id": "batch_2",
+      "agent_step": 2,
+      "model_request_index": 2,
+      "tool_names": [
+        "search_knowledge",
+        "calc_mass_balance",
+        "calc_temperature_change",
+        "convert_units",
+        "calc_heat_duty",
+        "calc_volume_flow",
+        "calc_residence_time",
+        "calc_split_flow",
+        "calc_heating_energy"
+      ],
+      "status": "succeeded",
+      "call_ids": [
+        "call_1",
+        "call_2",
+        "call_3",
+        "call_4",
+        "call_5",
+        "call_6",
+        "call_7",
+        "call_8",
+        "call_9"
+      ],
+      "started_at": "2026-10-14T14:14:09.725896+00:00",
+      "execution_mode": "ordered",
+      "actions": [
+        {
+          "position": 1,
+          "tool_name": "search_knowledge",
+          "status": "succeeded"
+        },
+        {
+          "position": 2,
+          "tool_name": "calc_mass_balance",
+          "status": "succeeded"
+        },
+        {
+          "position": 3,
+          "tool_name": "calc_temperature_change",
+          "status": "succeeded"
+        },
+        {
+          "position": 4,
+          "tool_name": "convert_units",
+          "status": "succeeded"
+        },
+        {
+          "position": 5,
+          "tool_name": "calc_heat_duty",
+          "status": "succeeded"
+        },
+        {
+          "position": 6,
+          "tool_name": "calc_volume_flow",
+          "status": "succeeded"
+        },
+        {
+          "position": 7,
+          "tool_name": "calc_residence_time",
+          "status": "succeeded"
+        },
+        {
+          "position": 8,
+          "tool_name": "calc_split_flow",
+          "status": "succeeded"
+        },
+        {
+          "position": 9,
+          "tool_name": "calc_heating_energy",
+          "status": "succeeded"
+        }
+      ],
+      "finished_at": "2026-10-14T14:14:12.110296+00:00",
+      "latency_ms": 2384.546
+    },
+    {
+      "batch_id": "batch_3",
+      "agent_step": 3,
+      "model_request_index": 3,
+      "tool_names": [
+        "final_answer"
+      ],
+      "status": "succeeded",
+      "call_ids": [],
+      "started_at": "2026-10-14T14:14:17.100602+00:00",
+      "execution_mode": "ordered",
+      "actions": [
+        {
+          "position": 1,
+          "tool_name": "final_answer",
+          "status": "succeeded"
+        }
+      ],
+      "finished_at": "2026-10-14T14:14:17.131140+00:00",
+      "latency_ms": 30.903
+    }
+  ],
+  "evidence": [
+    {
+      "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+      "title": "显热热负荷计算",
+      "text": "# 显热热负荷计算\n来源：项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。\n\n## 公式与输入\n无相变、定比热的稳态加热过程，热负荷 Q_dot = m_dot × cp × (T_out − T_in)。m_dot 是质量流量，单位 kg/s；cp 是质量比热容，单位 kJ/(kg·K)；温差单位 K；结果热负荷单位 kJ/s，即 kW。热负荷是加热功率，热量单位 kJ，与功率不是同一物理量。\n必须由题目或可核实的数据给出质量流量、比热容、入口温度和出口温度。缺少比热容时不能默认采用水的比热。\n\n## 教学算例与限制\n若题目给定流量 1000 kg/h、比热容 4.18 kJ/(kg·K)、入口 20 °C、出口 60 °C，则流量 = 1000/3600 kg/s，热负荷 = (1000/3600) × 4.18 × 40 = 46.4444 kW。4.18 仅是本题给定值，不是本系统提供的真实物性测量值。\n本式忽略散热、轴功及动能位能变化；相变、反应、比热显著变化时不能直接使用。",
+      "source": "项目自编教学说明，非实测物性数据；依据稳态能量守恒定义。",
+      "doc_id": "01_sensible_heat"
+    },
+    {
+      "chunk_id": "doc-932ed8a134107dcf2693c301-chunk-000",
+      "title": "计算结果的合理性检查",
+      "text": "# 计算结果的合理性检查\n来源：项目自编教学说明，非实测物性数据；项目教学计算核验约定。\n\n## 量纲与守恒\n热负荷结果应同时给出数值、功率单位、输入量和假设。流量、比热容为正时，热负荷符号应与温差一致；流量或温差翻倍时，定比热简化热负荷也翻倍。\n混合衡算应检查总质量流入等于流出、目标组分流入等于流出，出口质量分数位于入口最小值与最大值之间。两股同浓度物流混合后浓度不变。\n中间步骤保留精度，仅在展示时四舍五入。显示 46.44 kW 不意味着所有输入具有四位有效数字。记录教学算例与实际工程测量的区别。",
+      "source": "项目自编教学说明，非实测物性数据；项目教学计算核验约定。",
+      "doc_id": "14_result_checks"
+    },
+    {
+      "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+      "title": "复合单位的括号与乘除顺序",
+      "text": "# 复合单位的括号与乘除顺序\n来源：项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html\n\n## 清楚写出分母\n质量比热容写为 J/(kg·K) 或 J·kg⁻¹·K⁻¹，避免连续斜杠造成歧义。热负荷量纲检验为 (kg/s) × (kJ/(kg·K)) × K = kJ/s = kW；相同单位应成对消去。\n\n## 错误防范\nkg·K/J 是比热容的倒数，不能与 J/(kg·K) 互换。录入数据前先检查括号及量纲，再处理数值；即使数值看似合理，错误的物理量仍会产生错误结果。单位格式建议不表示输入解析器接受所有写法。",
+      "source": "项目教学整理，依据 NIST “SI Unit rules and style conventions checklist”；https://physics.nist.gov/cuu/Units/checklist.html",
+      "doc_id": "25_compound_unit_notation"
+    }
+  ],
+  "answer": "计算结果：\n- 混合后总流量：500 kg/h。\n- 目标组分质量流量：5 kg/h。\n- 目标组分质量分数：0.01（1%）。\n- 温差：40 K。\n- 显热热负荷：23.2222222222 kW（加热）。\n- 体积流量：0.5 m³/h。\n- 名义停留时间：2 h。\n- 名义停留时间：120 min。\n- 分支流量：150 kg/h。\n- 其余流量：350 kg/h。\n- 传热量：46.4444444444 kWh。\n- 传热量：167200 kJ。\n\n计算输入与方法：\n- 单位换算：500 kg/h → 0.138888888889 kg/s。\n- 混合流股 1：100 kg/h；目标组分质量分数 0.05。\n- 混合流股 2：400 kg/h；目标组分质量分数 0。\n- 混合公式：总流量 F = ΣF_j；目标组分质量分数 w = Σ(F_j × w_j) / F。\n- 温差计算输入：入口温度 25 ℃；出口温度 65 ℃。\n- 方法：ΔT = T_out − T_in。\n- 显热计算输入：质量流量 0.138888888889 kg/s；比热 4.18 kJ/(kg·K)；温差 40 K。\n- 显热公式：Q = m × cp × ΔT；使用未舍入的输入计算热负荷。\n- 体积流量计算输入：质量流量 500 kg/h；密度 1000 kg/m³。\n- 方法：V̇ = ṁ / ρ。\n- 名义停留时间输入：有效持液体积 1 m³；体积流量 0.5 m³/h。\n- 方法：τ = V / V̇。\n- 两路分流计算输入：总质量流量 500 kg/h；分流比例 0.3 。\n- 方法：F_branch = F_total × α; F_remainder = F_total − F_branch。\n- 恒定功率传热量输入：热功率 23.2222222222 kW；持续时间 2 h。\n- 方法：E_kWh = Q_kW × t_h; E_kJ = 3600 × E_kWh。\n\n适用条件：\n- 稳态、完全混合；无反应、无泄漏、无积累。\n- 所有流股的 mass_fraction 指同一守恒组分的质量分数，取值 0 到 1。\n- 所有输入及输出质量流量单位为 kg/h。\n- 输入为摄氏温度；温差 ΔT = 出口温度 − 入口温度，结果单位 K。\n- 正值表示升温，负值表示降温；温差供下游计算使用。\n- 单相、稳态、恒比热的显热计算；Q = 质量流量 × 定压比热 × 温差。\n- 无化学反应、无相变；忽略热损失、轴功以及动能、位能变化。\n- 比热需明确给定且适用于该温度区间，不由知识卡代填物性。\n- 正值表示加热，负值表示冷却；结果单位为 kW。\n- 体积流量 V̇ = 质量流量 / 密度，结果单位 m³/h。\n- 密度由用户或有来源的数据明确给定，并适用于当前物料与工况。\n- 稳态、恒定体积流量；名义停留时间 τ = 有效持液体积 / 体积流量。\n- 采用用户给定的有效持液体积与当前工况体积流量，输出 h 和 min。\n- 稳态、无积累、无泄漏的两路分流；分支质量流量 = 总质量流量 × 分流比例。\n- 其余质量流量 = 总质量流量 − 分支质量流量；两路结果单位 kg/h。\n- 分流比例表示流量比例；均匀物料分流时各路组成保持一致。\n- 恒定热功率；传热量 E = 热负荷 × 持续时间，1 kWh = 3600 kJ。\n- 正值表示加热传入能量，负值表示冷却移出能量；结果保留热负荷符号。\n- 热负荷采用对应工况的给定值或已成功计算的工具结果。\n\n展示最多保留 12 位有效数字；计算使用工具记录中的未舍入数值。\n\n补充说明：\n显热公式 Q = m × cp × ΔT 适用于无相变、定比热的稳态加热过程，其中 cp 必须对应实际物质、相态、温度范围和质量基准，缺少比热时不能默认采用水的比热。混合衡算基于稳态无反应系统的总质量守恒与组分质量守恒，出口质量分数应位于各入口质量分数之间。分流器与选择性分离器不同：分流时所有组分按同一比例进入各出口，因此两路组成保持一致，不能仅凭总流量分流比例推断分离纯度。热负荷是功率，传热量是功率对时间的累积，二者不是同一物理量。",
+  "citations": [
+    "doc-9d74e039ac796952f5b66af1-chunk-000",
+    "doc-932ed8a134107dcf2693c301-chunk-000",
+    "doc-2851839168b3a633784df100-chunk-000"
+  ],
+  "retrieval_index": {
+    "state": "ready",
+    "message": "LightRAG 索引已就绪。",
+    "document_count": 71,
+    "chunk_count": 71,
+    "backend": "lightrag"
+  },
+  "answer_source": "verified_tools_with_explanation",
+  "finished_at": "2026-10-14T14:14:17.119148+00:00",
+  "latency_ms": 13014.628,
+  "context_evidence": [
+    {
+      "chunk_id": "doc-9d74e039ac796952f5b66af1-chunk-000",
+      "title": "显热热负荷计算",
+      "request_indices": [
+        3
+      ]
+    },
+    {
+      "chunk_id": "doc-932ed8a134107dcf2693c301-chunk-000",
+      "title": "计算结果的合理性检查",
+      "request_indices": [
+        3
+      ]
+    },
+    {
+      "chunk_id": "doc-2851839168b3a633784df100-chunk-000",
+      "title": "复合单位的括号与乘除顺序",
+      "request_indices": [
+        3
+      ]
+    }
+  ],
+  "model_events": [
+    {
+      "requested_at": "2026-10-14T14:14:04.997896+00:00",
+      "status": "succeeded",
+      "finished_at": "2026-10-14T14:14:06.966021+00:00",
+      "latency_ms": 1969.223,
+      "selected_tools": [
+        "set_plan"
+      ],
+      "usage": {
+        "input_tokens": 6235,
+        "output_tokens": 402
+      }
+    },
+    {
+      "requested_at": "2026-10-14T14:14:06.981026+00:00",
+      "status": "succeeded",
+      "finished_at": "2026-10-14T14:14:09.723914+00:00",
+      "latency_ms": 2743.177,
+      "selected_tools": [
+        "search_knowledge",
+        "calc_mass_balance",
+        "calc_temperature_change",
+        "convert_units",
+        "calc_heat_duty",
+        "calc_volume_flow",
+        "calc_residence_time",
+        "calc_split_flow",
+        "calc_heating_energy"
+      ],
+      "usage": {
+        "input_tokens": 7285,
+        "output_tokens": 728
+      }
+    },
+    {
+      "requested_at": "2026-10-14T14:14:12.123296+00:00",
+      "status": "succeeded",
+      "finished_at": "2026-10-14T14:14:17.094227+00:00",
+      "latency_ms": 4972.027,
+      "selected_tools": [
+        "final_answer"
+      ],
+      "usage": {
+        "input_tokens": 17797,
+        "output_tokens": 717
+      }
+    }
+  ]
+}

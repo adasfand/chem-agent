@@ -6,6 +6,34 @@ import math
 import re
 import unicodedata
 
+from chem_agent.tool_catalog import NUMERIC_FUNCTIONS, TOOL_METADATA
+
+EXTRA_METRICS = {
+    "calc_temperature_change": [("delta_t_k", "温差", "K")],
+    "calc_volume_flow": [("volume_flow_m3_h", "体积流量", "m³/h")],
+    "calc_split_flow": [
+        ("branch_flow_kg_h", "分支流量", "kg/h"),
+        ("remainder_flow_kg_h", "其余流量", "kg/h"),
+    ],
+    "calc_residence_time": [
+        ("residence_time_h", "名义停留时间", "h"),
+        ("residence_time_min", "名义停留时间", "min"),
+    ],
+    "calc_heating_energy": [("energy_kwh", "传热量", "kWh"), ("energy_kj", "传热量", "kJ")],
+}
+EXTRA_INPUTS = {
+    "inlet_temperature_c": ("入口温度", "℃"),
+    "outlet_temperature_c": ("出口温度", "℃"),
+    "mass_flow_kg_h": ("质量流量", "kg/h"),
+    "density_kg_m3": ("密度", "kg/m³"),
+    "total_flow_kg_h": ("总质量流量", "kg/h"),
+    "split_fraction": ("分流比例", ""),
+    "vessel_volume_m3": ("有效持液体积", "m³"),
+    "volume_flow_m3_h": ("体积流量", "m³/h"),
+    "heat_duty_kw": ("热功率", "kW"),
+    "duration_h": ("持续时间", "h"),
+}
+
 
 def _number(value: float) -> str:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -27,7 +55,7 @@ def calculation_answer(calls: list[dict]) -> str | None:
         if call["status"] != "succeeded":
             continue
         tool = call["tool_name"]
-        if tool not in {"convert_units", "calc_heat_duty", "calc_mass_balance"}:
+        if tool not in NUMERIC_FUNCTIONS:
             continue
         output = call["output"]
         if tool == "convert_units":
@@ -48,6 +76,17 @@ def calculation_answer(calls: list[dict]) -> str | None:
                     "- 显热公式：Q = m × cp × ΔT；使用未舍入的输入计算热负荷。",
                 ]
             )
+        elif tool in EXTRA_METRICS:
+            results.extend(
+                f"- {label}：{_number(output[field])} {unit}。"
+                for field, label, unit in EXTRA_METRICS[tool]
+            )
+            rendered = [
+                f"{EXTRA_INPUTS[field][0]} {_number(value)} {EXTRA_INPUTS[field][1]}"
+                for field, value in output["inputs"].items()
+            ]
+            inputs.append(f"- {TOOL_METADATA[tool]['title']}输入：" + "；".join(rendered) + "。")
+            inputs.append(f"- 方法：{TOOL_METADATA[tool]['algorithm']}。")
         else:
             results.extend(
                 [
@@ -148,6 +187,18 @@ def _is_quantitative(text: str, calls: list[dict]) -> bool:
         "j",
         "千焦",
         "焦耳",
+        "kwh",
+        "m3/h",
+        "m3",
+        "kg/m3",
+        "h",
+        "min",
+        "s",
+        "小时",
+        "分钟",
+        "秒",
+        "立方米",
+        "千瓦时",
     }
     units.update(
         unicodedata.normalize("NFKC", call["output"]["unit"]).casefold()
@@ -158,7 +209,7 @@ def _is_quantitative(text: str, calls: list[dict]) -> bool:
         re.search(rf"\d\s*{re.escape(unit)}(?![a-z])", inspected) for unit in units
     )
     numeric_result = re.search(
-        r"(?:热负荷|加热负荷|质量分数|质量流量|总流量|组分流量|比热容?|温差|换算结果)"
+        r"(?:热负荷|加热负荷|质量分数|质量流量|总流量|组分流量|比热容?|温差|换算结果|密度|体积流量|停留时间|传热量|分支流量|其余流量|分流比例|热功率)"
         r"[^。；\n\d]{0,24}\d",
         inspected,
     )

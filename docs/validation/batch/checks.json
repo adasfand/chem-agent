@@ -1,0 +1,762 @@
+{
+  "mode": "offline_scripted_agent_and_browser_fixture",
+  "provider_requests": 0,
+  "agent": {
+    "status": "completed",
+    "record": "offline-batch.json",
+    "framework": "smolagents ToolCallingAgent",
+    "model_responses": "scripted",
+    "response_count": 3,
+    "batch_count": 3,
+    "multi_business_batch": "batch_2",
+    "multi_business_actions": 4,
+    "business_calls_succeeded": 4,
+    "execution_mode": "ordered",
+    "retrieval_backend": "lexical",
+    "heat_duty_kw": 23.22222222222222,
+    "result_references": {
+      "convert_units": "s2.total_flow_kg_h",
+      "calc_heat_duty": "s3.value"
+    }
+  },
+  "regression": {
+    "python_passed": 387,
+    "python_skipped": 1,
+    "frontend_passed": 70,
+    "frontend_test_files": 7,
+    "typecheck": true,
+    "build": true,
+    "lint": true,
+    "format": true,
+    "ruff_check": true,
+    "ruff_format": true
+  },
+  "browser": {
+    "frontend": "http://127.0.0.1:5173/",
+    "api_fixture": "actual offline execution record; other API requests aborted",
+    "desktop": [
+      1600,
+      1100
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "mobile_document_width": 390,
+    "mobile_batch_width": 350,
+    "console_errors": 0,
+    "console_warnings": 0,
+    "batch_expansion_checked": true,
+    "selected_vs_actual_calls_checked": true,
+    "heat_input_reference_checked": true,
+    "offline_notice_visible": true
+  },
+  "user_services": {
+    "backend_pid": 51372,
+    "frontend_pid": 51300,
+    "preserved": true,
+    "backend_restart_required_for_new_code": true
+  },
+  "checked_source": {
+    "method": "sha256 of canonical sorted path/content-digest list",
+    "sha256": "43fbdd5cc0f53c651f335ffffaf7c83d8bd77c9726c2d3cb8b6a4910ec5b9031",
+    "files": [
+      {
+        "path": ".env.example",
+        "sha256": "fad479e1c7c6ce89d1d68207dd0cf7cace7f6c01246d1b1a1f9caf82cc5eec8b"
+      },
+      {
+        "path": ".gitignore",
+        "sha256": "73b93ac0f9a09b4144281c04dc7938bd3a4e573a870f8b4622dd2e182a6c26b8"
+      },
+      {
+        "path": "AGENTS.md",
+        "sha256": "4d0ffd785a35191a0e841372fda209504292814ee53dbdfac5b9802e123fe625"
+      },
+      {
+        "path": "app.py",
+        "sha256": "b55b5601b22df6d8ef617adacb5a4b68c0957261eca3ab4e9fc74932694581af"
+      },
+      {
+        "path": "cli.py",
+        "sha256": "77b617c3a6760abdb807c5f43e68cc382455016b1527ded531b29eec4390c6ef"
+      },
+      {
+        "path": "data/knowledge/01_sensible_heat.md",
+        "sha256": "8d76ebff0c25b643b16092c8eb9a11061801f2108f1ac52ef83c55a722e2b0c5"
+      },
+      {
+        "path": "data/knowledge/02_heat_assumptions.md",
+        "sha256": "dc96a686b654d26d039933e55127f26cf12af64be9e4782a8c83d7747a9d31cc"
+      },
+      {
+        "path": "data/knowledge/03_mass_flow.md",
+        "sha256": "f8f16cae24127524c9ddb3197fa6706049a819866b26687f955b3cd46b208ff9"
+      },
+      {
+        "path": "data/knowledge/04_temperature_difference.md",
+        "sha256": "650f05832984ecf8d209c0faafa32a2a9dd4a5605b59b16200cc9abac40d2776"
+      },
+      {
+        "path": "data/knowledge/05_units_dimensions.md",
+        "sha256": "967d9519fb1487c18255177558d42f99a1557d3226e387fc2d3544e60b6b3812"
+      },
+      {
+        "path": "data/knowledge/06_specific_heat.md",
+        "sha256": "5a3442c4e3df9c024e4cf8f5a0d771c096a825d91072b73a8bf554154cb839b2"
+      },
+      {
+        "path": "data/knowledge/07_mass_fraction.md",
+        "sha256": "f6519e4819468f984b4926a2ea1a08bcc02f9019c59398a3871e21a4aad8b221"
+      },
+      {
+        "path": "data/knowledge/08_total_mass_balance.md",
+        "sha256": "bcaf22b5df40e10a3d52a3a2aa4cdfcbaa94a3386a7231110be9fd424bd871d3"
+      },
+      {
+        "path": "data/knowledge/09_component_balance.md",
+        "sha256": "c5e58aae71342e58af6b411bf9264f01d61bba6f5d4c44d3296bd50dbc2184ba"
+      },
+      {
+        "path": "data/knowledge/10_mixing_balance.md",
+        "sha256": "e05bac209210e0af03777b04288db086e36535880677b2084316c7db2ea60ef7"
+      },
+      {
+        "path": "data/knowledge/11_dilution.md",
+        "sha256": "87cf55e634158b165a107a32e91568303adbf8e40f542110b759f118179766e5"
+      },
+      {
+        "path": "data/knowledge/12_mass_volume.md",
+        "sha256": "0de46dfeff8f2c6e85927ff2250981d84b9bc789e443dc6c7e3f7d69f74c5269"
+      },
+      {
+        "path": "data/knowledge/13_missing_inputs.md",
+        "sha256": "8979f1ebaafb37188b0de7b230487051a1b248a0ebdd9a0d49976109f665d849"
+      },
+      {
+        "path": "data/knowledge/14_result_checks.md",
+        "sha256": "207a732ea3221c1b4c25965fe78f246a6d7805f16defc60be42de1392b23c611"
+      },
+      {
+        "path": "data/knowledge/15_retrieval_provenance.md",
+        "sha256": "fb26fcd141eccb4bf09444c0c87a51f2ffda85360693980a8490012debff6617"
+      },
+      {
+        "path": "data/knowledge/16_bipm_temperature_interval.md",
+        "sha256": "59a0eeeb73f77910eb337ba7afa67980d5ba56a4bc35a272189529bd14a73159"
+      },
+      {
+        "path": "data/knowledge/17_bipm_heat_power_units.md",
+        "sha256": "fb931bcfdeec8b81de7f60d1f755449d6c29d56c82880f2271b99f91e42b89f2"
+      },
+      {
+        "path": "data/knowledge/18_iupac_concentration_basis.md",
+        "sha256": "16cbfdabe3bbee4754848c260089fbd44a167465194c3474efeef49101e24696"
+      },
+      {
+        "path": "data/knowledge/19_iupac_heat_capacity_basis.md",
+        "sha256": "d964ddf388adc10a507b8243c75b4bf8ef7a1d9bfe18c533b8def5846cf3a277"
+      },
+      {
+        "path": "data/knowledge/20_nist_water_vapor_heat_capacity.md",
+        "sha256": "8ee1dcc22377d72b86c90bc620ddc61d3db29521aeee86c4441502b48ad1ee89"
+      },
+      {
+        "path": "data/knowledge/21_mit_two_stream_mixing.md",
+        "sha256": "c11a4e41c53a12ce1790d2096b60780b156b466574828778749fbb36ef13ef03"
+      },
+      {
+        "path": "data/knowledge/22_si_prefix_scaling.md",
+        "sha256": "a2047d4b9e863057099911900bd25794539ee97715b82073dff1f51e2a1e2cea"
+      },
+      {
+        "path": "data/knowledge/23_time_basis_alignment.md",
+        "sha256": "5856d557b0415fdabeda6a87dbe35acc63513898b100841e214679864f0954a3"
+      },
+      {
+        "path": "data/knowledge/24_litre_flow_conversion.md",
+        "sha256": "968fe49f27adaa43ea2172f65dcf378b35175fab126c7218807361d3d3ca5d8a"
+      },
+      {
+        "path": "data/knowledge/25_compound_unit_notation.md",
+        "sha256": "0479f3ee4407969b97add5b8a204df35537825f805178f3ad6685c0310954f25"
+      },
+      {
+        "path": "data/knowledge/26_percent_numeric_value.md",
+        "sha256": "bb90d81646bbf387949acf1b078bf347fd062d96ece6e86a5a16948cbe3ee4e6"
+      },
+      {
+        "path": "data/knowledge/27_molar_mass_units.md",
+        "sha256": "7a78b54b0919fe20c99f4dd87720fe223f71fafe7e171738031d139a01990007"
+      },
+      {
+        "path": "data/knowledge/28_molar_heat_capacity_conversion.md",
+        "sha256": "76be477ba5ee59b1de6695e0d686c1c5e8c09edfc0c81c14fd8a71c1dfc145f6"
+      },
+      {
+        "path": "data/knowledge/29_specific_heat_unit_equivalence.md",
+        "sha256": "d544003f51dd85d28222e443981f7c03596a5074ec9c5857c7724127e13d304f"
+      },
+      {
+        "path": "data/knowledge/30_heat_flux_and_heat_rate.md",
+        "sha256": "1edeb861a1a6819faf00c30c1f63a1b6acab27b4d1dbd74a3eab6f3dbd395216"
+      },
+      {
+        "path": "data/knowledge/31_batch_and_continuous_heating.md",
+        "sha256": "891652e71c428d5e3ee464337da8b4c4557735174f5178b4f133fffa785368e5"
+      },
+      {
+        "path": "data/knowledge/32_cooling_duty_sign.md",
+        "sha256": "7e4a29e605baca603f254946732dbffb26d7441cd4b0dfc16f3ae17fb29aea37"
+      },
+      {
+        "path": "data/knowledge/33_power_duration_energy.md",
+        "sha256": "9b9f9dcad001cb9289f4c3c5c51092bc4172741f29f4ae5f1ef777c16a3fd33d"
+      },
+      {
+        "path": "data/knowledge/34_vessel_heat_capacity.md",
+        "sha256": "cb99ef0d4a207cae11234634d4eb1785697b7eb74ecaf2996d152f7468439d92"
+      },
+      {
+        "path": "data/knowledge/35_volumetric_heat_capacity.md",
+        "sha256": "87855835e8338d9f48cf027116df5e4f38e434b588f042892ab4ef9dcc07c594"
+      },
+      {
+        "path": "data/knowledge/36_temperature_dependent_heat_capacity.md",
+        "sha256": "d97dab33d06d5226680ddd1e9c8e09c388cfa80ea1995cc9a6a4f0c7efd0c235"
+      },
+      {
+        "path": "data/knowledge/37_interval_average_heat_capacity.md",
+        "sha256": "38d88c256f526702bcbc8e78392f6534943e7d7310cf039255d2d927ab63fd17"
+      },
+      {
+        "path": "data/knowledge/38_shomate_reduced_temperature.md",
+        "sha256": "45d89e621911f96c47c1e3df1eccefc96b2f9398e8d4316450042579f18e6533"
+      },
+      {
+        "path": "data/knowledge/39_piecewise_property_integration.md",
+        "sha256": "fbcd2d201a13a2077aa27b9f54f0f4afa439e3f92b0852b40cd0c55d64551b85"
+      },
+      {
+        "path": "data/knowledge/40_ideal_gas_cp_cv.md",
+        "sha256": "674e5f4eaf01c6c784e38ccb51788aee562ec14553bcdf0a516322a6a6c7fe6f"
+      },
+      {
+        "path": "data/knowledge/41_enthalpy_reference_consistency.md",
+        "sha256": "d1c76334e04c19038c26b56ee400d9f2f16cd6370811af6229ff9d441c9c0aab"
+      },
+      {
+        "path": "data/knowledge/42_heat_work_energy_accounting.md",
+        "sha256": "577851a742b9b5db8ed3405be22123fccedf2d7ed34c1b77cb798449da1488bc"
+      },
+      {
+        "path": "data/knowledge/43_latent_heat_at_constant_temperature.md",
+        "sha256": "2ed3aaa788b3e2125a1da01508a99f21aab0933454a2d84d8c15a4550102a32c"
+      },
+      {
+        "path": "data/knowledge/44_sensible_latent_path_split.md",
+        "sha256": "29cdd82238560fe738bedd65684d190907fa89e24a5843987b2a68c8849cac24"
+      },
+      {
+        "path": "data/knowledge/45_ideal_gas_enthalpy_temperature.md",
+        "sha256": "79429f5aa316ff82d17d94ed4cf5881bd3c73bb48d05ba8cb7752cbeaa4584c0"
+      },
+      {
+        "path": "data/knowledge/46_steady_flow_shaft_work.md",
+        "sha256": "11b9c08dd44ed73fdb2646ff11b522128d95909b807cdd1928ea3770f596fe70"
+      },
+      {
+        "path": "data/knowledge/47_mass_to_mole_fraction.md",
+        "sha256": "3ea2fd60ac064833754dff2775774afbd34a862d5fa5222cc940c866956b5e1d"
+      },
+      {
+        "path": "data/knowledge/48_mole_to_mass_fraction.md",
+        "sha256": "4c16cd341ae4ba336376be3e0c7b8559c1ea6e38b913d9860af1a57bde3a6cc4"
+      },
+      {
+        "path": "data/knowledge/49_average_molar_mass.md",
+        "sha256": "3de4f981d1b2259ac5bef53b62cb614598f10d1d5814cbef1ae2688cdcc7d552"
+      },
+      {
+        "path": "data/knowledge/50_mass_concentration_conversion.md",
+        "sha256": "e3b2b3173cbfd3808ab00fba596bcfca26adc51db5789fd6a4760d9d361de567"
+      },
+      {
+        "path": "data/knowledge/51_amount_concentration_conversion.md",
+        "sha256": "6b240011223eee1b78b22b5f5bb4c1a90fe0c89bffe346a6a37ec5ca3a776e3c"
+      },
+      {
+        "path": "data/knowledge/52_ppm_basis.md",
+        "sha256": "bd2a7f7c3b15be9d37ece25af01f5cdcfc587520c4e076bc61254893dd3b4478"
+      },
+      {
+        "path": "data/knowledge/53_wet_to_dry_basis.md",
+        "sha256": "e989c984be6cc935539990d9c831c2f77f507f1aa66310862a1f9e1448af7b26"
+      },
+      {
+        "path": "data/knowledge/54_dry_to_wet_basis.md",
+        "sha256": "c4606ec2fcc3bc7435a34ee0e2229651384683017b8f6c68ce566d08438e90da"
+      },
+      {
+        "path": "data/knowledge/55_nonvolatile_concentration.md",
+        "sha256": "4837ae2dd6ccf9b9f04c27b9e643da01b7570b6a44b110be7defb2eee1152cdd"
+      },
+      {
+        "path": "data/knowledge/56_target_mix_ratio.md",
+        "sha256": "16dc9ffea922c8c0485667f00d79e33319b702bcc384a338c5684a1629ad2fea"
+      },
+      {
+        "path": "data/knowledge/57_mix_reachability.md",
+        "sha256": "a8ffa478ab617899a613cd1281873cd3f2bb2eca7769d4bbdb5548233cb0f6a0"
+      },
+      {
+        "path": "data/knowledge/58_multicomponent_closure.md",
+        "sha256": "31cb6de3cbde727c076d5b28ca0428ccf9431349d773a51365d822117ad39c24"
+      },
+      {
+        "path": "data/knowledge/59_ideal_stream_split.md",
+        "sha256": "1201629dca5fa321ef4dbc8189a1c826dbe5bee9b9cb3132477cb08e3997c6fb"
+      },
+      {
+        "path": "data/knowledge/60_splitter_vs_separator.md",
+        "sha256": "b3875d21b5a5dae9c6ab0b76df92ad2f3823efb6c7e3f40c76290d8f6c3d37a3"
+      },
+      {
+        "path": "data/knowledge/61_bypass_blending.md",
+        "sha256": "fc73a0cb650d19e710ef102d34a144e67eb5fba769852e9448c977e195afaca6"
+      },
+      {
+        "path": "data/knowledge/62_overall_boundary.md",
+        "sha256": "8c8eadf757a9df72e968fd7751100dd56e838d1c14b5852c0794b757cd0341e6"
+      },
+      {
+        "path": "data/knowledge/63_local_recycle_mixer.md",
+        "sha256": "a756f3add24e47ed2061e49468117d315b1761998ec5041d1c9b2b4614a1ed07"
+      },
+      {
+        "path": "data/knowledge/64_component_recovery.md",
+        "sha256": "ed0671c65d74b39035795b86665f19f96e59e28417a979d2113465529fae6b88"
+      },
+      {
+        "path": "data/knowledge/65_product_purity.md",
+        "sha256": "1bd7fbe31c3c5ec52a826574a99fedf86d05f2d6dc973f6532df8e75ee40d4e8"
+      },
+      {
+        "path": "data/knowledge/66_recycle_ratio.md",
+        "sha256": "4c30d48518f114c2ce3658b55d71680d0d1eb662f4ecb5382b7eca58f9bd37f3"
+      },
+      {
+        "path": "data/knowledge/67_purge_ratio.md",
+        "sha256": "e3d63d49ef3d12cdaa6ebd9fc8a604c8918c681599fc325271463c46d6d7b76b"
+      },
+      {
+        "path": "data/knowledge/68_impurity_purge_balance.md",
+        "sha256": "6d601987478ac97ac36948c69f6d9584c8fd30a71abcb6c13ec83f634abf941c"
+      },
+      {
+        "path": "data/knowledge/69_independent_balances.md",
+        "sha256": "0299923279a91548595edf22f7e4d803047434ccc4971eae1cd88757fa6a1a05"
+      },
+      {
+        "path": "data/knowledge/70_balance_scaling.md",
+        "sha256": "d948b41d63a8fb83dc747a494fc7ee3741e2c0a9a4626ba7b2c31b39713a08e0"
+      },
+      {
+        "path": "data/knowledge/71_balance_residual.md",
+        "sha256": "323f6d7a75315f20ffc1a0c0440147a941ab7eb547ec5949fc19f504287d7971"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "a89f94c3befa5e6687e2e89dad87f75bb970a031374f9b73e0e01d90ea943b18"
+      },
+      {
+        "path": "README.md",
+        "sha256": "30cf243292357edc26b538be69d0c49ba5c4cc6090174a1848cc14c66df04ebf"
+      },
+      {
+        "path": "scripts/demo_offline.py",
+        "sha256": "4d1eecbd2de2d5db2239c1143dd5ca10e79db6b3f41546faa03c6ec441f6377c"
+      },
+      {
+        "path": "scripts/package.py",
+        "sha256": "ee591f90bea354ee0259201874e9ce68d61f0662365c997e3132e3d8fb066062"
+      },
+      {
+        "path": "scripts/validate_live.py",
+        "sha256": "095a180142b52e85a57ebeabfc4da8f0a2342a992024d970d01f172c56b8f5a0"
+      },
+      {
+        "path": "src/chem_agent/__init__.py",
+        "sha256": "30b5b19842aa1ac7a68294c4fbaa016f08ab23a73c8929b24765d2438eefb5fb"
+      },
+      {
+        "path": "src/chem_agent/agent.py",
+        "sha256": "1573c9be5b26bf0ab37bce2e58b4e78a0965927888598b7ebd26194df587d7c2"
+      },
+      {
+        "path": "src/chem_agent/answers.py",
+        "sha256": "366bcb1b9d39339121d419b0c12ba50fa5ba973bc2e28ce6d05f3dbfc5ca35d2"
+      },
+      {
+        "path": "src/chem_agent/calculations.py",
+        "sha256": "8e37c6de8fa2b43f260d592733fece0dc584b16e5e8f3fc9afa095eb2c27981d"
+      },
+      {
+        "path": "src/chem_agent/cli.py",
+        "sha256": "f6c5b96a226d9bafc64751fd940a071fbf3a738c8f5b62facabf970db3f3d6c1"
+      },
+      {
+        "path": "src/chem_agent/config.py",
+        "sha256": "5a208b31c004991aff302a7b0848c2c60f99a21f70047f5b24a7fc5b9cedd215"
+      },
+      {
+        "path": "src/chem_agent/execution.py",
+        "sha256": "0a4963d0eaab22996b646dd9e9b5938d9520e20926f5797a7ffb18c4bdbdc979"
+      },
+      {
+        "path": "src/chem_agent/inputs.py",
+        "sha256": "69eb1ca4e627fface9e71d38aa695e9db927ffa55d590596efe95b36ce57d2ab"
+      },
+      {
+        "path": "src/chem_agent/knowledge.py",
+        "sha256": "27925528a07e582e8e4894f2260d88c664b6e3642dacfcfb3f2884dea37fcf7a"
+      },
+      {
+        "path": "src/chem_agent/mcp_registry.py",
+        "sha256": "4bc8654df3f9ee2ef284ddc059c1e5f35cc30c39d48807ac7859ff7826d989fd"
+      },
+      {
+        "path": "src/chem_agent/mcp_server.py",
+        "sha256": "787e931682036a1d3ccd62107d5b43d70dd178adb6e95c16a3cf97bee40e371e"
+      },
+      {
+        "path": "src/chem_agent/model.py",
+        "sha256": "13a0c088338c753d69f2819f4af085375064580bc51bbeebc49af1bc7865000b"
+      },
+      {
+        "path": "src/chem_agent/observability.py",
+        "sha256": "f31e906b293124214b2ef8fd6ccfdde7118269efb026c9589a991eeaf9165d41"
+      },
+      {
+        "path": "src/chem_agent/report.py",
+        "sha256": "30c5923c96c6763a99323c5dc052ee577764101a902dbd1cf12b95a32f3110d2"
+      },
+      {
+        "path": "src/chem_agent/retrieval.py",
+        "sha256": "04c71e63ddc60bbf538f28216ffb4164700d359ff2c28eb098543987e51d7ec8"
+      },
+      {
+        "path": "src/chem_agent/tools.py",
+        "sha256": "11de074f11ece9b32f5989f86420f70c1728d69b2bf9d9c412f72f393ba8289e"
+      },
+      {
+        "path": "src/chem_agent/trace.py",
+        "sha256": "0010910da2d7526031d135f9fbb738845f126342e24c53e8c9f54016b4c82e97"
+      },
+      {
+        "path": "src/chem_agent/ui.py",
+        "sha256": "0b4878d17603bfc4fd03bd80cbc4a09d435491fdeda83ec2fad0ba593a69a6f2"
+      },
+      {
+        "path": "src/chem_agent/validation.py",
+        "sha256": "cd83ef2753134e000618829c593ca77f31b67cb29ff514c2fce147a60e05eeb2"
+      },
+      {
+        "path": "src/chem_agent/web/.prettierrc.json",
+        "sha256": "7ec3f1c166f91d24d7a50f97bd09290377927486ebf5f793cf3dd594b8da3933"
+      },
+      {
+        "path": "src/chem_agent/web/app.js",
+        "sha256": "7fe3a6a7292dd02d9ed4c82f7a2ab5c837a18dff54960f629ca13825ff86e08d"
+      },
+      {
+        "path": "src/chem_agent/web/eslint.config.js",
+        "sha256": "91aaa8e33c968533f193571514fb190c508948fc9c6cfab9f67f3ea413921db5"
+      },
+      {
+        "path": "src/chem_agent/web/package-lock.json",
+        "sha256": "ed2f5fff012e674416b9444c18e8e7ea8315ac10caf00464409ac0b8076506b3"
+      },
+      {
+        "path": "src/chem_agent/web/package.json",
+        "sha256": "0775f3a4f375997153d73e8919c197d867fba99b4b71fda40328e0586b69295d"
+      },
+      {
+        "path": "src/chem_agent/web/src/App.vue",
+        "sha256": "a7492e0ef1c4badc7841ed86c8d5479275dbca53c814306ade260cc2c99cc134"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/CalculationInputs.vue",
+        "sha256": "76a692eed42a0e98ad321d96ab771434a5d7c5bfd1b4d7be88d47e13d16d3079"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/ConversationPanel.vue",
+        "sha256": "ba88b93edc05165dfc6c976d9f9208ec23fbff95c98dffa2e981339e89b3d4f9"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/EntityGraph.vue",
+        "sha256": "5ecf819a5e3b0414a0d2b2d5a85d6742e3833f7ab5d397a01f51a96b61aea394"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/EvidencePanel.vue",
+        "sha256": "d43db8fbd1687156cb595cb131f0b0694b6e20f1a31190bfe60860534b7ca839"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/ExecutionAudit.vue",
+        "sha256": "46ac1afa7bcff5004c70599fb11b2afcbe79834a8c989d84fccb87115b1050a6"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/ExecutionTrace.vue",
+        "sha256": "7de7b5785c1502ce39bd464c62eb6f266d7659ee21ec8616ab77c31a3c434a22"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/GraphSources.vue",
+        "sha256": "c35fb49123ffedf3b34f9ddc212f681e95770411bd36c06c9f114f6901ae0820"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/InlineText.vue",
+        "sha256": "45ca3dbc3a00d5f9badc5ac38ded8ab64e2f25660886341517849416fccdcd08"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/KnowledgeLibrary.vue",
+        "sha256": "752eb772eeeac0cb818d0ce352f2ff8ab41576e42b6c23e3131e7328e8be5cb4"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/MarkdownText.vue",
+        "sha256": "7fedab037ce4e14352d82385d4eede2378122ffe1c323a4a0a923ce6b19e1340"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/ResultPanel.vue",
+        "sha256": "ac52b096d1ce5745a492316adb8a974ca3e418b44c588471bfa370b4fc95b3f7"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/RetrievalPath.vue",
+        "sha256": "d9b01d3dcbb2429025cb764c8663087bd8731a57c5649868b1b8cedeeaa07d12"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/StatusBadge.vue",
+        "sha256": "53396ab3de5a7633c79f8c990d1b9645de4cb8c90ceecf36d0d9b63a7edb22bc"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/TaskComposer.vue",
+        "sha256": "8a09e89ccf6bc3cdcc76a8fb318df38558da3a2b09bf4c62774bcd2524141a49"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/ToolRegistryDialog.vue",
+        "sha256": "6243cf8d231e9aee22bfcbb8d314e7c09d4223d9ac2420470407130c28c30996"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/TraceInspector.vue",
+        "sha256": "c0da40296e313d8175556a74aa503c23a1daf56cae99a564d84fe364008ad1f8"
+      },
+      {
+        "path": "src/chem_agent/web/src/components/WorkbenchSidebar.vue",
+        "sha256": "6a2372bd1d6575ec5e3b28160a102035399649054454ad3cffade146c611c83f"
+      },
+      {
+        "path": "src/chem_agent/web/src/composables/useWorkbench.ts",
+        "sha256": "8855e2cec42fbd8acd7e5267bc2656878c22201b65edd7014a2e04f13335ea37"
+      },
+      {
+        "path": "src/chem_agent/web/src/main.ts",
+        "sha256": "98370329c529e598727efb3ba12003a7600612ed5f02c009add655133e6934c8"
+      },
+      {
+        "path": "src/chem_agent/web/src/services/api.ts",
+        "sha256": "0d65d2c7dd9c992d45daa781ed7a595c6a75c33df485432eec40c8fc4231aa7d"
+      },
+      {
+        "path": "src/chem_agent/web/src/services/knowledgeCache.ts",
+        "sha256": "fb252ab5d63dc73736881f07d21ef7fe42ea0776ad715c5858b8ff027b0b79f2"
+      },
+      {
+        "path": "src/chem_agent/web/src/styles/audit.css",
+        "sha256": "df98521d9c32e0160c98ae469a4e7093a45bf280242c1f5d66dee7c37278dfb5"
+      },
+      {
+        "path": "src/chem_agent/web/src/styles/tokens.css",
+        "sha256": "d68d8a75381ec16b4b90ee92f81883bada47242d02df73138cbdd11c681ab3aa"
+      },
+      {
+        "path": "src/chem_agent/web/src/styles/workbench.css",
+        "sha256": "a41a41decb83c7faddedb1770e3217d6bc6f4efdc2c0e4be02f2948390111095"
+      },
+      {
+        "path": "src/chem_agent/web/src/types/api.ts",
+        "sha256": "acb28e62a866f2fa896e70f2a939e164e8df01543f2cb8934970eabe584e3cb6"
+      },
+      {
+        "path": "src/chem_agent/web/src/utils/audit.ts",
+        "sha256": "2c1655c2cedeb0b43cccfcdd6d8948c1851fa99b60fd2a35817a7e70efd02b6d"
+      },
+      {
+        "path": "src/chem_agent/web/src/utils/conversations.ts",
+        "sha256": "94df1defe1dcbba04d598403a2977d6ea6df7f0ff1a57e2927ee804c062328f6"
+      },
+      {
+        "path": "src/chem_agent/web/src/utils/markdown.ts",
+        "sha256": "fc7c2f383d28256c37e758c0d07164b62c580e8f362a1819f8178e6393015412"
+      },
+      {
+        "path": "src/chem_agent/web/src/utils/presentation.ts",
+        "sha256": "fb44c272e2d03cfe4d51073f9137fe31a2df39760c3adb061ea80b6d0db3b6f3"
+      },
+      {
+        "path": "src/chem_agent/web/src/utils/retrieval.ts",
+        "sha256": "fd353126e40726c940e12b488f3883bced75e914908167851f3d139f38b0452c"
+      },
+      {
+        "path": "src/chem_agent/web/style.css",
+        "sha256": "81e5f594efb9e94d821261f43c170941bf54b90502ba54d17276629d242d4ce0"
+      },
+      {
+        "path": "src/chem_agent/web/tests/api.test.ts",
+        "sha256": "ed8a491ea20496d0020c20f6a71f7d5dc46c0501b8c892caebebc9a3efd364e8"
+      },
+      {
+        "path": "src/chem_agent/web/tests/audit.test.ts",
+        "sha256": "73ac6ff142b7a1443d5168a2b14b3a4292f7f9b0736afb39613e0fcfb8c720da"
+      },
+      {
+        "path": "src/chem_agent/web/tests/conversations.test.ts",
+        "sha256": "79c2160abe3cf9de1b9728bcf08bdba31e9e660599ca2514032109749a7ece78"
+      },
+      {
+        "path": "src/chem_agent/web/tests/knowledgeCache.test.ts",
+        "sha256": "35c983e72ea03e1f1d48873fee4e994b7a090f0a53b0dc5ee75d0b8b48d4dbb2"
+      },
+      {
+        "path": "src/chem_agent/web/tests/presentation.test.ts",
+        "sha256": "f09b21ebe84da5bdc8f369470f55045fa266de43288861aff51cd78b2c60ed0f"
+      },
+      {
+        "path": "src/chem_agent/web/tests/retrieval.test.ts",
+        "sha256": "bc2cafadf106b42d31ea75311a2fccbb20c109d3de04dde7ad5cdb4978a97168"
+      },
+      {
+        "path": "src/chem_agent/web/tests/workbench.test.ts",
+        "sha256": "47f96e679ba77ac0ffd3759d637a420c2c00b3b3eba88465e482eb5dc4e88b94"
+      },
+      {
+        "path": "src/chem_agent/web/tsconfig.json",
+        "sha256": "3b2ba7ee9820c054f91c705b3779e4279d6d3dc6507797d3a493bbd1e87e4bc0"
+      },
+      {
+        "path": "src/chem_agent/web/vite.config.ts",
+        "sha256": "8db91edc8750c4b1cd83869c50e840888a80b4e17df02160d5623b86d93b34f4"
+      },
+      {
+        "path": "tests/frontend_state.test.cjs",
+        "sha256": "f7f099f9ae7de51d3c0ee0ad953dc9a834a9829fb1267d12a071fed179fa7e85"
+      },
+      {
+        "path": "tests/test_agent.py",
+        "sha256": "55939a694dd79b29e50ba1de291de419b07cbdb653ff6b00db9d122680213e87"
+      },
+      {
+        "path": "tests/test_answers.py",
+        "sha256": "9c319daa478933b1ea6e62e2cde470d19cd61aae8132433c19cca4429a832147"
+      },
+      {
+        "path": "tests/test_calculations.py",
+        "sha256": "2d45df14f401480e8cbc46fcbc6e17960d697265b89a7eb478ead7de62f799db"
+      },
+      {
+        "path": "tests/test_cancellation.py",
+        "sha256": "a8a03499e0d6e3bf01e70ac09c885036a5f55344bf416e958acaeacb95c062cf"
+      },
+      {
+        "path": "tests/test_config_trace.py",
+        "sha256": "54b8f05f4eb7075721806c88f13aabcc36d07d9823d5cd574dcd4f5ba2b1d09d"
+      },
+      {
+        "path": "tests/test_container.py",
+        "sha256": "27c15d75fc253f1cef25f093f57f4748a6d35af1d96b3db12b7b0e9983521fcf"
+      },
+      {
+        "path": "tests/test_delivery.py",
+        "sha256": "557fea04a9e8d964a225f4c270ec4222a59d996b22f8e2d0198355d7713dfa12"
+      },
+      {
+        "path": "tests/test_execution.py",
+        "sha256": "e3e63fddf90a56a76e7532a7695d019823c92ba6ee7e58403ba23b58a2f238ba"
+      },
+      {
+        "path": "tests/test_execution_audit.py",
+        "sha256": "af74ba0cd3f42dc940141542b26eb44d8b9c6d88c6a122bb0c98ef2ade9d9ab7"
+      },
+      {
+        "path": "tests/test_execution_review.py",
+        "sha256": "ad820bdb05c7f6de6294f016d134734b7a9bd82406250e8bd91882f35bd807d5"
+      },
+      {
+        "path": "tests/test_graph_sources.py",
+        "sha256": "214638ac06ac8ed40680cc7be2eaa17134ff5c1e1d4cdb0bb83e5264fd8a7662"
+      },
+      {
+        "path": "tests/test_inputs.py",
+        "sha256": "23f4a6544584681f0e553c8ee412fb386dc3c77bed13b9e40b69b4a509cdadd6"
+      },
+      {
+        "path": "tests/test_knowledge.py",
+        "sha256": "7dcc4bdda16e0dd2637f65b82b947a483412d0c43cba63d2ba675334ba61638e"
+      },
+      {
+        "path": "tests/test_live_validation.py",
+        "sha256": "80ad1dba2e78e1d8962b9059aedfa7ec219f8bb77985d519842551b92ed39ab2"
+      },
+      {
+        "path": "tests/test_mcp_registry.py",
+        "sha256": "8eb254bc5e8060636a054bdc07a2293158230d98b07bda45ebbb0e565f94ea36"
+      },
+      {
+        "path": "tests/test_model.py",
+        "sha256": "8372853acc56777de661eb714f3e1affd65af969a032861b9766ace3a559b774"
+      },
+      {
+        "path": "tests/test_pipeline_evidence.py",
+        "sha256": "df26b3b9aa21f7ae288197375f716fa6e328a35a2ae56d4d6848f4a27c821dd1"
+      },
+      {
+        "path": "tests/test_report.py",
+        "sha256": "d8fc6f16b54f31a42429906a68ec31eaa3528d6de74e7ffcecfa9b20687c0086"
+      },
+      {
+        "path": "tests/test_retrieval.py",
+        "sha256": "ec1a20ba6b8f95076fe8592ec6f745ed4e93533b9047d46775dd738b0cb8d1ed"
+      },
+      {
+        "path": "tests/test_smoke.py",
+        "sha256": "3a3645d060f92a23882cf4fa72c3a0f844af9198e236b737f532e8baf66ba188"
+      },
+      {
+        "path": "tests/test_ui_api.py",
+        "sha256": "3c2509a900a19332bd9989f4c08ba195cacb8aef5a7f3519722fc2ad8db10b70"
+      },
+      {
+        "path": "uv.lock",
+        "sha256": "94c1022bcd5ae7f220340cd8407a761505fbe62284f723207ce3d931485ef641"
+      }
+    ]
+  },
+  "report": {
+    "path": "docs/化工领域知识增强大模型与工具调用算法研究报告.docx",
+    "sha256": "d84ace19e56c254eb2d38511e371971a8152998018741e4f779ac339b49b3c47",
+    "pages": 38,
+    "toc_entries_checked": 39,
+    "all_pages_visually_checked": true,
+    "template_parts_unchanged": true,
+    "equations_unchanged": 37,
+    "superscript_references_preserved": true
+  },
+  "screenshots": [
+    "batch-overview.png",
+    "batch-expanded.png",
+    "batch-heat.png",
+    "batch-plan.png",
+    "batch-metrics.png",
+    "offline-notice.png",
+    "batch-mobile.png",
+    "mobile-batches.png"
+  ]
+}

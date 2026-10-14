@@ -35,7 +35,7 @@ class TracedModel(OpenAIModel):
             client_kwargs={"timeout": settings.request_timeout, "max_retries": 0},
             retry=False,
             temperature=0,
-            max_tokens=1800,
+            max_tokens=4096,
             extra_body={"thinking": {"type": "disabled"}},
         )
 

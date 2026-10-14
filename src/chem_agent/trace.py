@@ -43,6 +43,8 @@ class RunTrace:
         self.directory = directory
         self.secrets = tuple(secrets)
         self._started = time.perf_counter()
+        self.active_batch_id: str | None = None
+        self.active_batch_position: int | None = None
         self.run_id = (
             datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:10]
         )
@@ -58,6 +60,7 @@ class RunTrace:
             "status": "running",
             "plan": [],
             "calls": [],
+            "tool_batches": [],
             "evidence": [],
             "model_requests": [],
             "answer": "",

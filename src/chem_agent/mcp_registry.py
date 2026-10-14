@@ -9,6 +9,7 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
+from chem_agent.tool_catalog import AGENT_TOOLS
 from chem_agent.tools import DESCRIPTIONS, BusinessTool
 from chem_agent.trace import utc_now
 
@@ -26,24 +27,6 @@ MCP_TOOLS = {
         "example": {"query": "显热", "limit": 5},
     },
 }
-AGENT_TOOLS = [
-    {
-        "name": "search_knowledge",
-        "title": "化工知识检索",
-        "description": "检索知识片段与实体关系。",
-    },
-    {"name": "convert_units", "title": "单位换算", "description": "换算兼容量纲的常用单位。"},
-    {
-        "name": "calc_heat_duty",
-        "title": "显热负荷计算",
-        "description": "根据给定比热、流量和温差计算。",
-    },
-    {
-        "name": "calc_mass_balance",
-        "title": "混合物料衡算",
-        "description": "计算总流量、组分流量与质量分数。",
-    },
-]
 
 
 class ToolRegistry:

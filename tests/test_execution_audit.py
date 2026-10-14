@@ -67,6 +67,36 @@ def test_selected_tools_are_response_actions_not_available_candidates(tmp_path, 
         model.client.close()
 
 
+def test_old_trace_stays_unbatched_and_new_batch_metadata_is_public_without_messages(tmp_path):
+    runtime = _Runtime(Settings(root=tmp_path, api_key="secret-test"))
+    old = {"status": "completed", "calls": [], "plan": []}
+    assert "tool_batches" not in runtime.clean_result(old)
+    batch = {
+        "batch_id": "batch_1",
+        "agent_step": 1,
+        "model_request_index": 1,
+        "tool_names": ["set_plan", "convert_units"],
+        "call_ids": ["call_1"],
+        "status": "succeeded",
+        "execution_mode": "ordered",
+        "latency_ms": 2,
+    }
+    public = runtime.clean_result({**old, "tool_batches": [batch]})
+    assert public["tool_batches"] == [batch]
+    assert "messages" not in str(public) and "reasoning_content" not in str(public)
+
+
+def test_model_request_allows_native_multiple_tool_selection(tmp_path):
+    trace = RunTrace(tmp_path, "test", {}, "test")
+    model = TracedModel(Settings(root=tmp_path, api_key="offline-dummy-key"), trace)
+    try:
+        request = model._prepare_completion_kwargs(messages=[])
+        assert request.get("parallel_tool_calls") is not False
+        assert request.get("extra_body", {}).get("parallel_tool_calls") is not False
+    finally:
+        model.client.close()
+
+
 def test_tool_registry_routes_validate_body_and_whitelist(tmp_path):
     from chem_agent.ui import create_app
 

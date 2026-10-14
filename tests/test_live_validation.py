@@ -401,6 +401,37 @@ def test_final_answer_rejection_and_retry_is_counted_once_from_text_blocks(heat_
     validation.check_heat(heat_result, 1000 / 3600 * 4.18 * 40)
 
 
+def test_ordered_batch_recovery_counts_actual_records_instead_of_repeated_messages(heat_result):
+    heat_result["tool_batches"] = [
+        {"status": "failed", "call_ids": [], "tool_names": ["final_answer", "convert_units"]},
+        {"status": "failed", "call_ids": [], "tool_names": ["final_answer"]},
+        {
+            "status": "succeeded",
+            "call_ids": ["call_1", "call_2"],
+            "tool_names": ["search_knowledge", "convert_units"],
+        },
+    ]
+    heat_result["model_requests"] = [
+        {"messages": [{"role": "user", "content": validation._BATCH_ERROR * 5}]}
+    ]
+    summary = validation.recovery_summary(heat_result)
+    assert summary["blocked_tool_batches"] == 1 and summary["failed_final_answers"] == 1
+    assert summary["failed_tool_calls"] == 0 and summary["recovered"] is True
+    assert summary["count_source"] == "actual ordered batch records and business tool records"
+
+
+def test_successful_multi_action_batch_is_not_counted_as_a_blocked_attempt(heat_result):
+    heat_result["tool_batches"] = [
+        {
+            "status": "succeeded",
+            "call_ids": ["call_1", "call_2"],
+            "tool_names": ["set_plan", "search_knowledge", "convert_units"],
+        }
+    ]
+    summary = validation.recovery_summary(heat_result)
+    assert summary["blocked_tool_batches"] == 0 and summary["recovered"] is False
+
+
 def test_ready_backend_is_not_silently_treated_as_lexical(heat_result):
     with pytest.raises(AssertionError, match="后端"):
         validation.check_backend(heat_result, "lightrag")

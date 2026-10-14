@@ -100,6 +100,53 @@ def test_cycle_and_duplicate_steps_are_rejected(execution):
         execution.set_plan([heat_plan()[0], heat_plan()[0]])
 
 
+def test_agent_plan_normalization_adds_only_existing_prior_search_and_preserves_input(execution):
+    execution.require_retrieval = True
+    plan = [
+        {"step_id": "s1", "goal": "检索", "tool_name": "search_knowledge"},
+        {"step_id": "s2", "goal": "混合", "tool_name": "calc_mass_balance"},
+        {"step_id": "s3", "goal": "流量换算", "tool_name": "convert_units", "depends_on": ["s2"]},
+        {"step_id": "s4", "goal": "显热", "tool_name": "calc_heat_duty", "depends_on": ["s3"]},
+    ]
+    original = deepcopy(plan)
+    with pytest.raises(ValueError, match="依赖该检索"):
+        execution.set_plan(plan)
+    assert execution.trace.data["plan"] == []
+    result = execution.set_plan(plan, normalize_retrieval_dependencies=True)
+    assert plan == original
+    assert [s["depends_on"] for s in result["steps"]] == [[], ["s1"], ["s2"], ["s3"]]
+    assert result["dependency_adjustments"] == [{"step_id": "s2", "depends_on_added": ["s1"]}]
+    assert execution.trace.data["plan_dependency_adjustments"] == result["dependency_adjustments"]
+    # The normalized edge is actually enforced; it never permits evidence-free calculations.
+    with pytest.raises(ValueError, match="前序步骤未成功"):
+        execution.execute(
+            "calc_mass_balance", "s2", {"streams": [{"flow_kg_h": 1, "mass_fraction": 0}]}
+        )
+
+
+@pytest.mark.parametrize("kind", ["absent", "later", "forward", "overflow"])
+def test_plan_normalization_never_invents_prerequisites_or_leaves_partial_state(execution, kind):
+    execution.require_retrieval = True
+    search = {"step_id": "s1", "goal": "检索", "tool_name": "search_knowledge"}
+    mix = {"step_id": "s2", "goal": "混合", "tool_name": "calc_mass_balance"}
+    plan = {
+        "absent": [mix],
+        "later": [mix, search],
+        "forward": [search | {"depends_on": ["s2"]}, mix],
+        "overflow": [
+            search,
+            {"step_id": "s3", "goal": "换算", "tool_name": "convert_units"},
+            mix | {"depends_on": ["s3"] * 10},
+        ],
+    }[kind]
+    original = deepcopy(plan)
+    with pytest.raises(ValueError):
+        execution.set_plan(plan, normalize_retrieval_dependencies=True)
+    assert plan == original
+    assert execution.trace.data["plan"] == []
+    assert "plan_dependency_adjustments" not in execution.trace.data
+
+
 def test_plan_cannot_be_replaced_after_execution(execution):
     execution.set_plan(heat_plan())
     with pytest.raises(ValueError):

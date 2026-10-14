@@ -9,6 +9,7 @@ export interface PlanStep {
   tool_name: string
   depends_on: string[]
   status: StepStatus
+  algorithm?: string
 }
 export interface ToolCall {
   call_id: string
@@ -31,6 +32,28 @@ export interface ToolCall {
   output?: Record<string, JsonValue>
   error?: JsonValue
   input_provenance?: Record<string, JsonValue>[]
+  batch_id?: string
+  batch_position?: number
+}
+export interface ToolBatch {
+  batch_id: string
+  agent_step: number
+  model_request_index: number | null
+  tool_names: string[]
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled'
+  call_ids: string[]
+  started_at: string
+  finished_at?: string
+  latency_ms?: number
+  error?: JsonValue
+  execution_mode: 'ordered'
+  actions?: {
+    position: number
+    tool_name: string
+    status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'cancelled'
+    error?: string
+    dependency_adjustments?: { step_id: string; depends_on_added: string[] }[]
+  }[]
 }
 export interface ModelEvent {
   requested_at?: string
@@ -49,6 +72,8 @@ export interface RegisteredTool {
   input_schema?: Record<string, JsonValue>
   output_schema?: Record<string, JsonValue> | null
   example?: Record<string, JsonValue>
+  algorithm?: string
+  capability_kind?: string
 }
 export interface ToolRegistry {
   state: 'connected' | 'unavailable'
@@ -98,6 +123,7 @@ export interface RunResult {
   latency_ms?: number
   mode?: string
   model_events?: ModelEvent[]
+  tool_batches?: ToolBatch[]
   context_evidence?: { chunk_id: string; title: string; request_indices: number[] }[]
   plan: PlanStep[]
   calls: ToolCall[]

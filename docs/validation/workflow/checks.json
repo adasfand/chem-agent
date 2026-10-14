@@ -95,9 +95,15 @@
   },
   "report": {
     "path": "docs/化工领域知识增强大模型与工具调用算法研究报告.docx",
-    "sha256": "1ea1601ca1d2554fa7788481af77f0821cf0bd5de6b41918c3fdacf0ff7b7bc2",
-    "pages": 32,
+    "sha256": "d84ace19e56c254eb2d38511e371971a8152998018741e4f779ac339b49b3c47",
+    "pages": 38,
     "toc_entries_checked": 39,
-    "format_checked": true
+    "format_checked": true,
+    "content_checked_against_saved_workflows": true
+  },
+  "additional_validation": {
+    "path": "../batch/checks.json",
+    "mode": "offline_scripted_agent_and_browser_fixture",
+    "provider_requests": 0
   }
 }
