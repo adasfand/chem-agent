@@ -31,6 +31,11 @@ _MANIFEST_SCHEMA = 2
 _SOURCE_SEPARATOR = "<SEP>"
 _CHUNK_TEXT_LIMIT = 1800
 _DESCRIPTION_LIMIT = 360
+# Graph recall is independent of the number of passages used as answer evidence.
+_GRAPH_TOP_K = 40
+_GRAPH_ENTITY_LIMIT = 80
+_GRAPH_RELATION_LIMIT = 160
+_GRAPH_SOURCE_LIMIT = 128
 _REQUIRED_STORE_FILES = (
     "graph_chunk_entity_relation.graphml",
     "kv_store_doc_status.json",
@@ -327,11 +332,11 @@ async def _query_ready(rag: Any, query: str, top_k: int) -> dict[str, Any]:
             query,
             QueryParam(
                 mode="mix",
-                top_k=top_k,
+                top_k=_GRAPH_TOP_K,
                 chunk_top_k=top_k,
-                max_entity_tokens=900,
-                max_relation_tokens=900,
-                max_total_tokens=4500,
+                max_entity_tokens=4000,
+                max_relation_tokens=5000,
+                max_total_tokens=14000,
                 enable_rerank=False,
             ),
         )
@@ -378,10 +383,13 @@ def _map_result(
     )
     raw_chunks = data.get("chunks") if isinstance(data.get("chunks"), list) else []
     raw_references = data.get("references") if isinstance(data.get("references"), list) else []
-    truncated |= len(raw_entities) > 12 or len(raw_relationships) > 18 or len(raw_chunks) > top_k
+    graph_truncated = (
+        len(raw_entities) > _GRAPH_ENTITY_LIMIT or len(raw_relationships) > _GRAPH_RELATION_LIMIT
+    )
+    truncated |= graph_truncated or len(raw_chunks) > top_k
 
     entities = []
-    for item in raw_entities[:12]:
+    for item in raw_entities[:_GRAPH_ENTITY_LIMIT]:
         if not isinstance(item, dict):
             continue
         name = clipped(item.get("entity_name"), 100)
@@ -397,7 +405,7 @@ def _map_result(
             )
 
     relationships = []
-    for item in raw_relationships[:18]:
+    for item in raw_relationships[:_GRAPH_RELATION_LIMIT]:
         if not isinstance(item, dict):
             continue
         source = clipped(item.get("src_id"), 100)
@@ -475,7 +483,7 @@ def _map_result(
             source_id for item in [*entities, *relationships] for source_id in item["source_ids"]
         )
     )
-    truncated |= len(graph_ids) > 32
+    truncated |= len(graph_ids) > _GRAPH_SOURCE_LIMIT
     try:
         stored_chunks = json.loads((directory / "kv_store_text_chunks.json").read_text("utf-8"))
     except (OSError, ValueError):
@@ -484,7 +492,7 @@ def _map_result(
         stored_chunks = {}
     hit_by_id = {hit["chunk_id"]: hit for hit in hits}
     graph_sources = []
-    for chunk_id in graph_ids[:32]:
+    for chunk_id in graph_ids[:_GRAPH_SOURCE_LIMIT]:
         hit = hit_by_id.get(chunk_id)
         if hit is not None:
             card = hit
@@ -540,6 +548,13 @@ def _map_result(
             "keyword_model": settings.model,
             "keyword_step": "LightRAG 内部关键词抽取（可能命中缓存）",
             "processing_info": public_processing,
+            "graph_limits": {
+                "entities": _GRAPH_ENTITY_LIMIT,
+                "relationships": _GRAPH_RELATION_LIMIT,
+                "graph_sources": _GRAPH_SOURCE_LIMIT,
+            },
+            "graph_truncated": graph_truncated,
+            "sources_truncated": len(graph_ids) > _GRAPH_SOURCE_LIMIT,
             "returned_counts": {
                 "entities": len(entities),
                 "relationships": len(relationships),
@@ -550,6 +565,7 @@ def _map_result(
                 "entities": len(raw_entities),
                 "relationships": len(raw_relationships),
                 "chunks": len(raw_chunks),
+                "graph_sources": len(graph_ids),
             },
             "truncated": truncated,
         },

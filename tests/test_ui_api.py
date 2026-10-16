@@ -133,6 +133,19 @@ def test_bootstrap_cookie_knowledge_and_no_model_request(app, monkeypatch):
         assert client.get("/api/session").json()["id"] == bootstrap["session"]["id"]
 
 
+def test_graph_exploration_is_read_only_and_validates_bounds(app, monkeypatch):
+    monkeypatch.setattr(ui, "run_task", lambda *a, **k: pytest.fail("unexpected model request"))
+    with client_for(app) as client:
+        response = client.get("/api/knowledge-graph")
+        assert response.status_code == 200
+        assert response.json()["scope"] == "index_exploration"
+        assert response.json()["state"] == "missing"
+        assert response.json()["entities"] == []
+        assert client.get("/api/knowledge-graph?limit=121").status_code == 422
+        assert client.get("/api/knowledge-graph", params={"query": "x" * 101}).status_code == 422
+        assert client.get("/api/session").json()["runs"] == []
+
+
 def test_session_isolation_hides_jobs_and_exports(app, runner):
     with client_for(app) as alice, client_for(app) as bob:
         first = run_one(alice)

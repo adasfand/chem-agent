@@ -8,6 +8,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   BookOpen,
+  Network,
 } from '@lucide/vue'
 import { createWorkbench } from './composables/useWorkbench'
 import WorkbenchSidebar from './components/WorkbenchSidebar.vue'
@@ -15,6 +16,7 @@ import TaskComposer from './components/TaskComposer.vue'
 import ConversationPanel from './components/ConversationPanel.vue'
 import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import TraceInspector from './components/TraceInspector.vue'
+import KnowledgeGraphExplorer from './components/KnowledgeGraphExplorer.vue'
 const workbench = createWorkbench()
 const {
   state,
@@ -25,7 +27,7 @@ const {
   conversationTurns,
   selectedConversationId,
 } = workbench
-const view = ref<'workbench' | 'knowledge'>('workbench')
+const view = ref<'workbench' | 'knowledge' | 'graph'>('workbench')
 const knowledgeId = ref<string | null>(null)
 const inspectorOpen = ref(true)
 const settingsDialog = ref<HTMLDialogElement>()
@@ -84,10 +86,20 @@ onUnmounted(workbench.dispose)
           工作空间
           <span>/</span>
           <strong>
-            {{ view === 'workbench' ? '问答工作台' : '知识资料库' }}
+            {{
+              view === 'workbench' ? '问答工作台' : view === 'graph' ? '知识图谱探索' : '知识资料库'
+            }}
           </strong>
         </div>
         <div class="topbar-actions">
+          <button
+            class="icon-button"
+            title="知识图谱探索"
+            aria-label="打开知识图谱探索"
+            @click="view = 'graph'"
+          >
+            <Network :size="18" />
+          </button>
           <button
             class="icon-button mobile-new"
             aria-label="新建问答"
@@ -209,6 +221,11 @@ onUnmounted(workbench.dispose)
           @knowledge="openKnowledge"
         />
       </div>
+      <KnowledgeGraphExplorer
+        v-else-if="view === 'graph'"
+        @knowledge="openKnowledge"
+        @ask="newTask"
+      />
       <div v-else class="library-workspace">
         <div class="library-heading">
           <div>

@@ -5,8 +5,75 @@ import {
   retrievalFor,
   sourceIds,
   safeUrl,
+  completeRetrievalGraph,
+  retrievalNotices,
 } from '../src/utils/retrieval'
 describe('retrieval provenance', () => {
+  it('keeps 24 entities visible and completes only explicitly returned relation endpoints', () => {
+    const entities = Array.from({ length: 24 }, (_, i) => ({ id: `E${i}`, name: `实体${i}` }))
+    const relationships = [
+      { source: '实体0', target: '端点', source_ids: ['edge-source'] },
+      { source: 'E1', target: '端点', source_ids: ['second-source'] },
+    ]
+    const before = JSON.stringify({ entities, relationships })
+    const graph = completeRetrievalGraph(entities, relationships)
+    expect(graph.entities).toHaveLength(25)
+    expect(graph.endpointCount).toBe(1)
+    expect(graph.entities.at(-1)).toMatchObject({
+      id: '端点',
+      relationship_endpoint: true,
+      source_ids: ['edge-source', 'second-source'],
+    })
+    expect(graphLayout(graph.entities, graph.relationships).edges).toHaveLength(2)
+    expect(JSON.stringify({ entities, relationships })).toBe(before)
+  })
+  it('bounds oversized imported graphs and reports missing endpoints instead of inventing links', () => {
+    const entities = Array.from({ length: 90 }, (_, i) => ({ id: `E${i}` }))
+    const relationships = Array.from({ length: 200 }, (_, i) => ({ source: 'E0', target: `E${i}` }))
+    const graph = completeRetrievalGraph(entities, relationships)
+    expect(graph.entities).toHaveLength(80)
+    expect(graph.relationships).toHaveLength(160)
+    expect(graph.limited).toBe(true)
+    expect(graphLayout(graph.entities, graph.relationships).edges).toHaveLength(79)
+    expect(retrievalNotices({}, entities, relationships, graph).join('')).toContain('80 个实体')
+    const endpointBounded = completeRetrievalGraph(entities.slice(0, 79), [
+      { source: 'E0', target: 'extra-1' },
+      { source: 'E0', target: 'extra-2' },
+    ])
+    expect(endpointBounded.entities).toHaveLength(80)
+    expect(endpointBounded.limited).toBe(true)
+  })
+  it('distinguishes historical clipping, upstream budgets, and text-only truncation', () => {
+    const entities = [{ id: 'E' }]
+    const graph = completeRetrievalGraph(entities, [])
+    expect(
+      retrievalNotices(
+        { original_counts: { entities: 20 }, truncated: true },
+        entities,
+        [],
+        graph,
+      ).join(''),
+    ).toContain('旧记录')
+    expect(
+      retrievalNotices(
+        { graph_limits: { entities: 80 }, original_counts: { entities: 90 } },
+        entities,
+        [],
+        graph,
+      ).join(''),
+    ).toContain('保存上限')
+    expect(
+      retrievalNotices(
+        { processing_info: { total_entities_found: 40, entities_after_truncation: 20 } },
+        entities,
+        [],
+        graph,
+      ).join(''),
+    ).toContain('文本预算')
+    expect(retrievalNotices({ truncated: true }, entities, [], graph).join('')).toContain(
+      '不代表图中实体被隐藏',
+    )
+  })
   it('focuses a cited hit entity over an unrelated node with more connections', () => {
     const entities = [
       { id: 'separator', name: '稳态无反应分离器', source_ids: ['unselected'] },

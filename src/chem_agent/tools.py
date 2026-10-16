@@ -9,7 +9,7 @@ from chem_agent.execution import Execution
 from chem_agent.model import RunCancelled
 
 DESCRIPTIONS = {
-    "search_knowledge": '检索本地化工资料；索引就绪时使用 LightRAG 图谱与向量混合检索。arguments={"query":"显热公式适用条件","top_k":3}。返回 hits 的 chunk_id 用于引用；retrieval 包含本轮实际实体、关系和片段。无命中时可用新查询重试同一步；依赖它的步骤被阻断，不能声明整轮完成。命中不代表事实正确，无相关资料时不能编造来源。',
+    "search_knowledge": '检索本地化工资料；索引就绪时使用 LightRAG 图谱与向量混合检索。arguments={"query":"显热公式适用条件","top_k":3}。返回 hits 的 chunk_id 用于引用；retrieval 提供检索摘要；完整实体、关系和关联原文保存在执行记录中。无命中时可用新查询重试同一步；依赖它的步骤被阻断，不能声明整轮完成。命中不代表事实正确，无相关资料时不能编造来源。',
     "convert_units": '换算兼容量纲的常用单位。arguments={"value":1000,"from_unit":"kg/h","to_unit":"kg/s"}。返回 value、unit。温差用 delta_degC、delta_K；绝对温度用 degC、K。',
     "calc_heat_duty": '计算单相恒比热显热负荷。arguments={"mass_flow_kg_s":{"$ref":"s2.value"},"specific_heat_kj_kg_k":4.18,"delta_t_k":40}。比热必须由用户给出，不能查表代填。温差可由明确起止温度作差。若依赖换算步骤，质量流量必须使用 $ref。返回 heat_duty_kw、inputs、assumptions。',
     "calc_mass_balance": '稳态无反应混合衡算。arguments={"streams":[{"flow_kg_h":100,"mass_fraction":0.05},{"flow_kg_h":400,"mass_fraction":0}]}。质量分数必须在0..1，百分数5%写0.05；纯水中盐分数为0。禁止将摩尔分数当质量分数。返回 total_flow_kg_h、component_flow_kg_h、mass_fraction，不返回 value。后续引用混合总流量使用 {"$ref":"s2.total_flow_kg_h"}（s2为实际混合步骤编号）。',
@@ -43,7 +43,22 @@ class BusinessTool(Tool):
 
     def forward(self, step_id: str, arguments: dict) -> dict:
         check_cancelled(self.cancel_event)
-        return self.execution.execute(self.name, step_id, arguments)
+        result = self.execution.execute(self.name, step_id, arguments)
+        if self.name != "search_knowledge":
+            return result
+        # The trace retains the full graph for inspection. Only actual hit
+        # passages and compact retrieval metadata go into the model context;
+        # expanding the visual graph must not flood it with uncited sources.
+        output = result["output"]
+        retrieval = output.get("retrieval")
+        if not isinstance(retrieval, dict):
+            return result
+        summary = {
+            key: retrieval[key]
+            for key in ("query", "mode", "keywords", "metadata")
+            if key in retrieval
+        }
+        return {**result, "output": {**output, "retrieval": summary}}
 
 
 class PlanTool(Tool):

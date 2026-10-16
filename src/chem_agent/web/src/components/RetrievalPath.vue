@@ -80,6 +80,7 @@ watch(
       <p v-if="query.mode === 'lexical'" class="inline-note">
         本轮使用词法检索，没有实体关系数据。
       </p>
+      <p v-for="notice in query.notices" :key="notice" class="inline-note">{{ notice }}</p>
       <template v-if="graph.nodes.length">
         <EntityGraph
           v-model:selected="selected"
@@ -155,9 +156,6 @@ watch(
           <span v-else>{{ text(item.source) || '未标注来源' }}</span>
         </p>
       </details>
-      <p v-if="query.metadata.truncated" class="inline-note">
-        后端对检索数据做了截断，当前视图并非全部索引内容。
-      </p>
     </template>
   </div>
 </template>

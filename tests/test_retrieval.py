@@ -313,6 +313,9 @@ def test_ready_mix_maps_graph_and_real_chunks(settings, monkeypatch):
 
         async def aquery_data(self, query, param):
             calls.append((query, param.mode, param.top_k, param.chunk_top_k))
+            assert param.max_entity_tokens == 4000
+            assert param.max_relation_tokens == 5000
+            assert param.max_total_tokens == 14000
             cache = Path(self.working_dir) / "kv_store_llm_response_cache.json"
             cache.write_text('{"keywords": {"original_prompt": "私有查询"}}', encoding="utf-8")
             cache.chmod(0o644)
@@ -381,7 +384,7 @@ def test_ready_mix_maps_graph_and_real_chunks(settings, monkeypatch):
     assert retrieval["references"][0]["url"] == "https://example.org/heat"
     assert retrieval["metadata"]["keyword_model"] == settings.model
     assert retrieval["metadata"]["keyword_step"].startswith("LightRAG")
-    assert calls == ["initialize", ("显热公式", "mix", 2, 2), "finalize"]
+    assert calls == ["initialize", ("显热公式", "mix", 40, 2), "finalize"]
     if os.name == "posix":
         assert (
             S_IMODE((retriever.directory / "kv_store_llm_response_cache.json").stat().st_mode)

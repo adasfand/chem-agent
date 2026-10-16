@@ -137,3 +137,73 @@ def test_onnxruntime_import_does_not_create_telemetry_id_in_project(tmp_path: Pa
         timeout=30,
     )
     assert not (tmp_path / ":memory:.ses").exists()
+
+
+@pytest.mark.parametrize("size", [24, 81])
+def test_graph_preserves_medium_results_and_reports_large_result_limits(tmp_path, size):
+    cards = tmp_path / "data" / "knowledge"
+    cards.mkdir(parents=True)
+    (cards / "heat.md").write_text("# 显热\n来源：教学卡\n\n显热公式。", encoding="utf-8")
+    settings = Settings(root=tmp_path)
+    knowledge = KnowledgeBase(cards)
+    chunks = {
+        f"chunk-{i}": {"file_path": "heat.md", "content": f"依据 {i}"} for i in range(size * 2)
+    }
+    (tmp_path / "kv_store_text_chunks.json").write_text(json.dumps(chunks), encoding="utf-8")
+    raw = {
+        "data": {
+            "entities": [{"entity_name": f"E{i}", "source_id": f"chunk-{i}"} for i in range(size)],
+            "relationships": [
+                {
+                    "src_id": f"E{i % size}",
+                    "tgt_id": f"E{(i + 1) % size}",
+                    "source_id": f"chunk-{i}",
+                }
+                for i in range(size * 2)
+            ],
+            "chunks": [{"chunk_id": "chunk-0", **chunks["chunk-0"]}],
+        }
+    }
+    result = _map_result(raw, "显热", 1, knowledge, settings, tmp_path)
+    graph = result["retrieval"]
+    assert len(graph["entities"]) == min(size, 80)
+    assert len(graph["relationships"]) == min(size * 2, 160)
+    assert len(graph["graph_sources"]) == min(size * 2, 128)
+    assert graph["metadata"]["graph_truncated"] is (size > 80)
+    assert graph["metadata"]["sources_truncated"] is (size * 2 > 128)
+    assert graph["metadata"]["original_counts"]["entities"] == size
+    assert graph["metadata"]["original_counts"]["relationships"] == size * 2
+    assert [hit["chunk_id"] for hit in result["hits"]] == ["chunk-0"]
+
+
+def test_graph_size_does_not_inflate_model_context_or_change_trace():
+    from types import SimpleNamespace
+
+    from chem_agent.tools import BusinessTool
+
+    graph = {
+        "entities": [{"id": "heat"}],
+        "relationships": [{"source": "heat", "target": "cp"}],
+        "graph_sources": [{"chunk_id": "associated", "text": "not a hit"}],
+        "query": "显热",
+        "mode": "mix",
+        "metadata": {"returned_counts": {"entities": 1}},
+    }
+    result = {
+        "step_id": "s1",
+        "status": "succeeded",
+        "output": {
+            "hits": [{"chunk_id": "hit", "text": "actual evidence"}],
+            "retrieval": graph,
+        },
+    }
+    before = json.dumps(result)
+    execution = SimpleNamespace(execute=lambda *_args: result)
+    observation = BusinessTool("search_knowledge", execution).forward("s1", {"query": "显热"})
+    assert observation["output"]["hits"] == result["output"]["hits"]
+    assert observation["output"]["retrieval"] == {
+        "query": "显热",
+        "mode": "mix",
+        "metadata": {"returned_counts": {"entities": 1}},
+    }
+    assert json.dumps(result) == before

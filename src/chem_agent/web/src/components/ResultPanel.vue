@@ -7,6 +7,7 @@ import { exportUrl } from '../services/api'
 import StatusBadge from './StatusBadge.vue'
 import MarkdownText from './MarkdownText.vue'
 import CalculationInputs from './CalculationInputs.vue'
+import RunShowcase from './RunShowcase.vue'
 const props = defineProps<{
   job: Job | null
   loading: boolean
@@ -101,6 +102,7 @@ async function copyAnswer() {
           <p v-if="job.result.status !== 'completed' && metrics.length" class="inline-note">
             以下数值来自已成功步骤，整个任务尚未完成。
           </p>
+          <RunShowcase v-if="job.finished" :job="job" />
           <div v-if="metrics.length" class="metric-grid">
             <article v-for="(metric, index) in metrics" :key="index" class="metric-card">
               <span>{{ metric.label }}</span>
