@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from dotenv import dotenv_values
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -545,6 +545,15 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/api/session")
     def session_info(request: Request):
         return runtime.session_view(request.state.chem_session)
+
+    @app.get("/api/knowledge-graph")
+    def knowledge_graph(
+        query: str = Query(default="", max_length=100),
+        limit: int = Query(default=72, ge=12, le=120),
+    ):
+        from chem_agent.knowledge_graph import graph_overview
+
+        return redact(graph_overview(runtime.knowledge, query, limit), runtime.secrets)
 
     @app.get("/api/tool-registry")
     async def tool_registry(refresh: bool = False):

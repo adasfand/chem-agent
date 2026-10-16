@@ -1925,3 +1925,10 @@ summary {
 .library-content-search {
   margin: 0 16px 8px;
 }
+
+.example-grid.single-example {
+  grid-template-columns: 1fr;
+}
+.example-grid.single-example .example-card p {
+  -webkit-line-clamp: 4;
+}

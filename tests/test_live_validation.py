@@ -510,8 +510,8 @@ def test_main_preserves_original_cases_adds_mixed_case_and_reports_recovery(
     tmp_path, monkeypatch, heat_result, mixed_result, capsys
 ):
     project = tmp_path / "project"
-    (project / "examples").mkdir(parents=True)
-    (project / "examples" / "tasks.json").write_text(
+    (project / "tests/fixtures").mkdir(parents=True)
+    (project / "tests/fixtures/regression_cases.json").write_text(
         json.dumps(
             [
                 {"id": name, "question": name}

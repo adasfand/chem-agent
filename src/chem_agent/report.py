@@ -6,7 +6,7 @@ import math
 import re
 from typing import Any
 
-from chem_agent.answers import EXTRA_METRICS
+from chem_agent.answers import EXTRA_METRICS, NUMBER_DISPLAY_NOTE, format_number
 from chem_agent.tool_catalog import NUMERIC_FUNCTIONS, TOOL_METADATA
 from chem_agent.trace import redact
 
@@ -85,7 +85,7 @@ def _inline(text: str) -> str:
     return f"{delimiter} {text or '—'} {delimiter}"
 
 
-def _number(value: Any) -> str | None:
+def _number(value: Any, unit: str = "") -> str | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     try:
@@ -93,7 +93,7 @@ def _number(value: Any) -> str | None:
             return None
     except OverflowError:
         return None
-    return format(value, ".12g")
+    return format_number(value, unit)
 
 
 def _metrics(call: dict) -> list[tuple[str, str, str]]:
@@ -103,7 +103,7 @@ def _metrics(call: dict) -> list[tuple[str, str, str]]:
     rows = []
 
     def add(label: str, value: Any, unit: Any) -> None:
-        number = _number(value)
+        number = _number(value, unit if isinstance(unit, str) else "")
         if number is not None and isinstance(unit, str) and unit.strip():
             rows.append((label, number, unit))
 
@@ -235,7 +235,7 @@ def render_report(result: dict) -> str:
                 "| --- | --- | --- | --- | --- |",
                 *numeric_rows,
                 "",
-                "数值最多显示 12 位有效数字；质量分数使用 0–1 口径。",
+                NUMBER_DISPLAY_NOTE + "质量分数使用 0–1 口径。",
             ]
         )
     else:

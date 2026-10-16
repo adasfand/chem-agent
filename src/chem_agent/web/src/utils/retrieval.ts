@@ -19,6 +19,11 @@ export const entityTypeLabel = (value: string) =>
     process: '过程',
     material: '物质',
     artifact: '对象',
+    content: '知识内容',
+    event: '事件',
+    naturalobject: '自然物质',
+    organization: '机构',
+    relationship_endpoint: '关系端点',
   })[value.toLowerCase()] ||
   value ||
   '实体'
@@ -38,22 +43,130 @@ export const sourceIds = (item: RetrievalRecord) => [
 ]
 export const safeUrl = (value: unknown) =>
   typeof value === 'string' && /^https?:\/\/[^\s<>"']+$/i.test(value) ? value : ''
+
+export const retrievalGraphLimits = { entities: 80, relationships: 160 }
+
+export function completeRetrievalGraph(
+  entities: RetrievalRecord[],
+  relationships: RetrievalRecord[],
+) {
+  const nodes = entities.slice(0, retrievalGraphLimits.entities).map((item) => ({ ...item }))
+  const links = relationships.slice(0, retrievalGraphLimits.relationships)
+  const byAlias = new Map<string, RetrievalRecord>()
+  const normalize = (value: string) => value.trim().toLowerCase()
+  for (const node of nodes)
+    for (const alias of [node.id, node.name, node.entity_name])
+      if (text(alias).trim()) byAlias.set(normalize(text(alias)), node)
+  let endpointCount = 0
+  let endpointsLimited = false
+  for (const edge of links) {
+    for (const name of [
+      text(edge.source) || text(edge.src_id),
+      text(edge.target) || text(edge.tgt_id),
+    ]) {
+      const key = normalize(name)
+      if (!key) continue
+      let node = byAlias.get(key)
+      if (!node && nodes.length >= retrievalGraphLimits.entities) endpointsLimited = true
+      if (!node && nodes.length < retrievalGraphLimits.entities) {
+        node = {
+          id: name.trim(),
+          name: name.trim(),
+          type: 'relationship_endpoint',
+          description: '该名称来自本轮返回关系的端点，未返回独立实体说明；请核对关联关系原文。',
+          source_ids: [],
+          relationship_endpoint: true,
+        }
+        nodes.push(node)
+        byAlias.set(key, node)
+        endpointCount++
+      }
+      if (node?.relationship_endpoint)
+        node.source_ids = [...new Set([...sourceIds(node), ...sourceIds(edge)])]
+    }
+  }
+  return {
+    entities: nodes,
+    relationships: links,
+    endpointCount,
+    limited:
+      endpointsLimited || entities.length > nodes.length || relationships.length > links.length,
+  }
+}
+
+export function retrievalNotices(
+  metadata: RetrievalRecord,
+  entities: RetrievalRecord[],
+  relationships: RetrievalRecord[],
+  graph: ReturnType<typeof completeRetrievalGraph>,
+) {
+  const notices: string[] = []
+  const original = record(metadata.original_counts)
+  const processing = record(metadata.processing_info)
+  const count = (value: unknown) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
+  const lostEntities = Math.max(0, (count(original.entities) ?? entities.length) - entities.length)
+  const lostRelations = Math.max(
+    0,
+    (count(original.relationships) ?? relationships.length) - relationships.length,
+  )
+  if (lostEntities || lostRelations) {
+    const counts = `保存了 ${entities.length} / ${count(original.entities) ?? entities.length} 个检索实体、${relationships.length} / ${count(original.relationships) ?? relationships.length} 条关系。`
+    notices.push(
+      counts +
+        (metadata.graph_limits
+          ? '超出保存上限的部分未保留。'
+          : '旧记录已按原上限截断；重新提问后使用新的检索范围。'),
+    )
+  }
+  if (graph.endpointCount)
+    notices.push(
+      `另显示 ${graph.endpointCount} 个本轮关系中的端点，以保留真实连线；端点未提供独立实体说明。`,
+    )
+  if (graph.limited)
+    notices.push(
+      '图谱最多显示 80 个实体、160 条关系，按返回顺序保留；其余已保存数据可在执行记录中查看。',
+    )
+  const upstreamEntities = count(processing.total_entities_found)
+  const upstreamRelations = count(processing.total_relations_found)
+  const finalEntities = count(processing.entities_after_truncation)
+  const finalRelations = count(processing.relations_after_truncation)
+  if (
+    (upstreamEntities !== undefined &&
+      finalEntities !== undefined &&
+      upstreamEntities > finalEntities) ||
+    (upstreamRelations !== undefined &&
+      finalRelations !== undefined &&
+      upstreamRelations > finalRelations)
+  )
+    notices.push('检索器已按相关性与文本预算筛选候选，本图展示筛选后的返回结果。')
+  if (metadata.sources_truncated) notices.push('关联原文数量已达上限，未载入的来源会单独标明。')
+  if (metadata.truncated && !notices.length)
+    notices.push('部分描述或原文可能按长度截断；这不代表图中实体被隐藏。')
+  return notices
+}
+
 export function retrievalFor(call: ToolCall) {
   const data = record(call.output?.retrieval)
   const highLevel = parts(record(data.keywords).high_level)
   const lowLevel = parts(record(data.keywords).low_level)
+  const entities = records(data.entities)
+  const relationships = records(data.relationships)
+  const graph = completeRetrievalGraph(entities, relationships)
+  const metadata = record(data.metadata)
   return {
     query: text(data.query) || text(call.arguments?.query) || text(call.requested_arguments?.query),
     mode: text(data.mode),
     keywords: [...highLevel, ...lowLevel],
     highLevel,
     lowLevel,
-    entities: records(data.entities),
-    relationships: records(data.relationships),
+    entities: graph.entities,
+    relationships: graph.relationships,
     hits: records(call.output?.hits),
     sources: records(data.graph_sources),
     references: records(data.references),
-    metadata: record(data.metadata),
+    metadata,
+    notices: retrievalNotices(metadata, entities, relationships, graph),
   }
 }
 function arrangeRing(count: number, links: [number, number][]) {

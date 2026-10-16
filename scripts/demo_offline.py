@@ -78,12 +78,25 @@ def run_demo(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="离线固定流程演示；不调用模型或下载索引")
-    parser.add_argument("--flow", type=float, default=1000, help="质量流量 kg/h")
-    parser.add_argument("--cp", type=float, default=4.18, help="用户给定比热 kJ/(kg·K)")
-    parser.add_argument("--delta-t", type=float, default=40, help="温差 K")
+    parser.add_argument("--flow", type=float, help="单项回归用质量流量 kg/h")
+    parser.add_argument("--cp", type=float, help="单项回归用比热 kJ/(kg·K)")
+    parser.add_argument("--delta-t", type=float, help="单项回归用温差 K")
     args = parser.parse_args()
     # Do not load .env or keys: this path always uses the local lexical retriever.
-    result = run_demo(Settings(root=ROOT), args.flow, args.cp, args.delta_t)
+    if all(value is None for value in (args.flow, args.cp, args.delta_t)):
+        if __package__:
+            from scripts.demo_continuous import run_continuous_demo
+        else:
+            from demo_continuous import run_continuous_demo
+
+        result = run_continuous_demo(Settings(root=ROOT))
+    else:
+        result = run_demo(
+            Settings(root=ROOT),
+            1000 if args.flow is None else args.flow,
+            4.18 if args.cp is None else args.cp,
+            40 if args.delta_t is None else args.delta_t,
+        )
     report = ROOT / "runs" / f"{result['run_id']}.md"
     report.write_text(render_report(result), encoding="utf-8")
     report.chmod(0o600)

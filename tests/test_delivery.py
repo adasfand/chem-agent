@@ -49,6 +49,8 @@ def test_package_excludes_private_nested_files_and_cache(tmp_path, monkeypatch):
         "scripts/.venv/private.py",
         "tests/test_ok.py",
         "docs/ARCHITECTURE.md",
+        "docs/面向化工领域专业知识的大模型知识增强与工具调用算法研究报告.docx",
+        "docs/validation/continuous/results.png",
         "Dockerfile",
         "compose.yaml",
         ".dockerignore",
@@ -69,13 +71,33 @@ def test_package_excludes_private_nested_files_and_cache(tmp_path, monkeypatch):
     assert f"{tmp_path.name}/Dockerfile" in names
     assert f"{tmp_path.name}/compose.yaml" in names
     assert f"{tmp_path.name}/.dockerignore" in names
-    assert f"{tmp_path.name}/化工知识增强与工具调用_代码交付初步方案.md" in names
+    assert f"{tmp_path.name}/化工知识增强与工具调用_代码交付初步方案.md" not in names
+    assert f"{tmp_path.name}/docs/validation/continuous/results.png" in names
+    assert f"{tmp_path.name}/docs/ARCHITECTURE.md" not in names
     assert not any(
         "private" in name.split("/", 1)[1]
         or "linked" in name.split("/", 1)[1]
         or ".env.production" in name
         for name in names
     )
+
+
+def test_package_does_not_traverse_installed_dependencies(tmp_path, monkeypatch):
+    dependencies = tmp_path / "src" / "web" / "node_modules"
+    dependencies.mkdir(parents=True)
+    (dependencies / "private.js").write_text("private")
+    (tmp_path / "src" / "public.py").write_text("public")
+    scandir = os.scandir
+
+    def guarded_scandir(path):
+        assert Path(path) != dependencies, "Dependency directories must be pruned before traversal"
+        return scandir(path)
+
+    monkeypatch.setattr(package, "ROOT", tmp_path)
+    monkeypatch.setattr(os, "scandir", guarded_scandir)
+    package.main()
+    with zipfile.ZipFile(tmp_path / "dist" / f"{tmp_path.name}.zip") as archive:
+        assert archive.namelist() == [f"{tmp_path.name}/src/public.py"]
 
 
 @pytest.mark.parametrize("directory", ["data", "docs"])

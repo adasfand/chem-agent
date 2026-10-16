@@ -16,7 +16,7 @@ ToolName = Literal[
     "calc_residence_time",
     "calc_heating_energy",
 ]
-MAX_PLAN_STEPS = 10
+MAX_PLAN_STEPS = 16
 MAX_TOOL_ATTEMPTS = 20
 AGENT_TOOLS = [
     {
@@ -32,7 +32,7 @@ AGENT_TOOLS = [
         "description": "换算兼容量纲的常用单位。",
         "algorithm": "量纲校验与单位归一化",
         "capability_kind": "calculation",
-        "example": {"value": 500, "from_unit": "kg/h", "to_unit": "kg/s"},
+        "example": {"value": 3000, "from_unit": "kg/h", "to_unit": "kg/s"},
     },
     {
         "name": "calc_heat_duty",

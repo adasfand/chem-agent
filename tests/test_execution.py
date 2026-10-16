@@ -136,7 +136,7 @@ def test_plan_normalization_never_invents_prerequisites_or_leaves_partial_state(
         "overflow": [
             search,
             {"step_id": "s3", "goal": "换算", "tool_name": "convert_units"},
-            mix | {"depends_on": ["s3"] * 10},
+            mix | {"depends_on": ["s3"] * 16},
         ],
     }[kind]
     original = deepcopy(plan)

@@ -4,7 +4,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 const webRoot = fileURLToPath(new URL('.', import.meta.url))
 
-const target = 'http://127.0.0.1:7860'
+const target = process.env.CHEM_BACKEND_URL || 'http://127.0.0.1:7860'
 // Preserve the browser's Host and Origin together. FastAPI enforces their equality.
 const proxy = {
   '/api': {

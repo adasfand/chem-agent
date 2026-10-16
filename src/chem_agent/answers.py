@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from decimal import ROUND_HALF_UP, Decimal
 
 from chem_agent.tool_catalog import NUMERIC_FUNCTIONS, TOOL_METADATA
 
@@ -35,10 +36,32 @@ EXTRA_INPUTS = {
 }
 
 
-def _number(value: float) -> str:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+NUMBER_DISPLAY_NOTE = (
+    "热负荷（kW）及传热量（kWh）最多保留 2 位小数，kg/s 流量最多 4 位小数，"
+    "其他数值最多 7 位有效数字；极小或极大值使用科学计数法，计算使用工具记录中的未舍入数值。"
+)
+
+
+def format_number(value: float, unit: str = "") -> str:
+    """Round display strings only; retain tiny nonzero values and the recorded numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("计算答复需要有限的工具数值。")
-    return format(value, ".12g")
+    try:
+        finite = math.isfinite(value)
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise ValueError("计算答复需要有限的工具数值。")
+    if value == 0:
+        return "0"
+    places = {"kw": 2, "kwh": 2, "kg/s": 4}.get(unit.replace(" ", "").casefold())
+    if places is not None and abs(value) < 1e7:
+        rounded = Decimal(str(value)).quantize(Decimal(10) ** -places, rounding=ROUND_HALF_UP)
+        if rounded:
+            return format(rounded, "f").rstrip("0").rstrip(".")
+        coefficient, exponent = format(value, ".6e").split("e")
+        return coefficient.rstrip("0").rstrip(".") + "e" + exponent
+    return format(value, ".7g")
 
 
 def calculation_answer(calls: list[dict]) -> str | None:
@@ -60,29 +83,31 @@ def calculation_answer(calls: list[dict]) -> str | None:
         output = call["output"]
         if tool == "convert_units":
             conversions.append(
-                f"- 单位换算：{_number(output['from_value'])} {output['from_unit']}"
-                f" → {_number(output['value'])} {output['unit']}。"
+                f"- 单位换算：{format_number(output['from_value'], output['from_unit'])}"
+                f" {output['from_unit']}"
+                f" → {format_number(output['value'], output['unit'])} {output['unit']}。"
             )
         elif tool == "calc_heat_duty":
             duty = output["heat_duty_kw"]
             direction = "加热" if duty > 0 else "冷却" if duty < 0 else "零热负荷"
-            results.append(f"- 显热热负荷：{_number(duty)} kW（{direction}）。")
+            results.append(f"- 显热热负荷：{format_number(duty, 'kW')} kW（{direction}）。")
             values = output["inputs"]
             inputs.extend(
                 [
-                    f"- 显热计算输入：质量流量 {_number(values['mass_flow_kg_s'])} kg/s；"
-                    f"比热 {_number(values['specific_heat_kj_kg_k'])} kJ/(kg·K)；"
-                    f"温差 {_number(values['delta_t_k'])} K。",
+                    f"- 显热计算输入：质量流量 {format_number(values['mass_flow_kg_s'], 'kg/s')}"
+                    f" kg/s；比热 {format_number(values['specific_heat_kj_kg_k'])} kJ/(kg·K)；"
+                    f"温差 {format_number(values['delta_t_k'])} K。",
                     "- 显热公式：Q = m × cp × ΔT；使用未舍入的输入计算热负荷。",
                 ]
             )
         elif tool in EXTRA_METRICS:
             results.extend(
-                f"- {label}：{_number(output[field])} {unit}。"
+                f"- {label}：{format_number(output[field], unit)} {unit}。"
                 for field, label, unit in EXTRA_METRICS[tool]
             )
             rendered = [
-                f"{EXTRA_INPUTS[field][0]} {_number(value)} {EXTRA_INPUTS[field][1]}"
+                f"{EXTRA_INPUTS[field][0]} {format_number(value, EXTRA_INPUTS[field][1])}"
+                f" {EXTRA_INPUTS[field][1]}"
                 for field, value in output["inputs"].items()
             ]
             inputs.append(f"- {TOOL_METADATA[tool]['title']}输入：" + "；".join(rendered) + "。")
@@ -90,16 +115,16 @@ def calculation_answer(calls: list[dict]) -> str | None:
         else:
             results.extend(
                 [
-                    f"- 混合后总流量：{_number(output['total_flow_kg_h'])} kg/h。",
-                    f"- 目标组分质量流量：{_number(output['component_flow_kg_h'])} kg/h。",
-                    f"- 目标组分质量分数：{_number(output['mass_fraction'])}"
-                    f"（{_number(output['mass_fraction'] * 100)}%）。",
+                    f"- 混合后总流量：{format_number(output['total_flow_kg_h'])} kg/h。",
+                    f"- 目标组分质量流量：{format_number(output['component_flow_kg_h'])} kg/h。",
+                    f"- 目标组分质量分数：{format_number(output['mass_fraction'])}"
+                    f"（{format_number(output['mass_fraction'] * 100)}%）。",
                 ]
             )
             for index, stream in enumerate(call["arguments"]["streams"], 1):
                 inputs.append(
-                    f"- 混合流股 {index}：{_number(stream['flow_kg_h'])} kg/h；"
-                    f"目标组分质量分数 {_number(stream['mass_fraction'])}。"
+                    f"- 混合流股 {index}：{format_number(stream['flow_kg_h'])} kg/h；"
+                    f"目标组分质量分数 {format_number(stream['mass_fraction'])}。"
                 )
             inputs.append("- 混合公式：总流量 F = ΣF_j；目标组分质量分数 w = Σ(F_j × w_j) / F。")
         for assumption in output.get("assumptions", []):
@@ -112,7 +137,7 @@ def calculation_answer(calls: list[dict]) -> str | None:
         lines.extend(["", "计算输入与方法：", *conversions, *inputs])
     if assumptions:
         lines.extend(["", "适用条件：", *(f"- {item}。" for item in assumptions)])
-    lines.extend(["", "展示最多保留 12 位有效数字；计算使用工具记录中的未舍入数值。"])
+    lines.extend(["", NUMBER_DISPLAY_NOTE])
     return "\n".join(lines)
 
 

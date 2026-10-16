@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from chem_agent.calculations import calc_heat_duty, calc_mass_balance, convert_units
+from chem_agent.engineering_tools import calc_heating_energy
 from chem_agent.report import render_report
 
 
@@ -74,14 +75,46 @@ def test_completed_report_separates_model_answer_from_actual_numeric_results():
     assert result["question"] in report
     assert result["answer"] in report
     numbers = report.split("## 实际工具结果", 1)[1].split("## 执行计划", 1)[0]
-    assert "46.4444444444" in numbers
+    assert "` 46.44 `" in numbers
     assert "999" not in numbers
-    assert "0.277777777778" in numbers
+    assert "` 0.2778 `" in numbers
     assert "kg/s" in numbers and "kW" in numbers
     assert "2 次成功工具调用" in numbers
     assert "无相变" in report
     assert "20261002T100000-test" in report
     assert result == original
+
+
+def test_export_rounds_display_only_and_preserves_tiny_results_and_source_quotes():
+    result = completed_result()
+    result["calls"][0]["output"] = convert_units(500, "kg/h", "kg/s")
+    result["calls"][1]["output"] = calc_heat_duty(500 / 3600, 4.18, 40)
+    result["calls"].extend(
+        [
+            {
+                "step_id": "s3",
+                "tool_name": "calc_heating_energy",
+                "status": "succeeded",
+                "output": calc_heating_energy(500 / 3600 * 4.18 * 40, 2),
+            },
+            {
+                "step_id": "s4",
+                "tool_name": "calc_heat_duty",
+                "status": "succeeded",
+                "output": calc_heat_duty(1e-12, 1, 1),
+            },
+        ]
+    )
+    quote = "知识卡中的原始小数 46.44444444444444 kW。"
+    result["evidence"][0]["text"] = quote
+    original_json = json.dumps(result)
+    report = render_report(result)
+    numbers = report.split("## 实际工具结果", 1)[1].split("## 执行计划", 1)[0]
+    for displayed in ("` 23.22 `", "` 46.44 `", "` 0.1389 `", "` 1e-12 `"):
+        assert displayed in numbers
+    assert "23.222222" not in numbers and "46.444444" not in numbers
+    assert quote in report
+    assert json.dumps(result) == original_json
 
 
 def test_missing_input_report_preserves_question_without_inventing_result():

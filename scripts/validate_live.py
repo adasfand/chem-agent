@@ -412,7 +412,9 @@ def main(argv: list[str] | None = None) -> None:
     settings, index_state = prepare_settings(Settings.load(ROOT), args.index_root, args.backend)
     examples = {
         example["id"]: example["question"]
-        for example in json.loads((ROOT / "examples/tasks.json").read_text(encoding="utf-8"))
+        for example in json.loads(
+            (ROOT / "tests/fixtures/regression_cases.json").read_text(encoding="utf-8")
+        )
     }
     report = {
         "created_at": datetime.now(timezone.utc).isoformat(),

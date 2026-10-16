@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from chem_agent.answers import calculation_answer, format_number
+from chem_agent.engineering_tools import calc_heating_energy
 from chem_agent.execution import Execution
 from chem_agent.knowledge import KnowledgeBase
 from chem_agent.report import render_report
@@ -55,7 +57,7 @@ def test_completed_heat_replaces_wrong_model_arithmetic_and_keeps_unrounded_trac
     model_answer = "0.2778 × 4.18 × 40 = 999 kW。"
     answer = execution.complete(model_answer, "completed", [])
     expected = flow / 3600 * 4.18 * 40
-    assert f"{expected:.12g} kW" in answer
+    assert f"{expected:.2f} kW" in answer
     assert "999" not in answer and "0.2778 ×" not in answer
     assert "使用未舍入的输入计算" in answer
     for condition in (
@@ -86,7 +88,8 @@ def test_answer_uses_changed_inputs_and_does_not_default_to_teaching_values(
 ):
     heat(execution, flow, capacity=2.5, delta=delta)
     answer = execution.complete("热负荷46.44 kW。", "completed", [])
-    assert f"{flow / 3600 * 2.5 * delta:.12g} kW（{label}）" in answer
+    shown = f"{flow / 3600 * 2.5 * delta:.2f}".rstrip("0").rstrip(".")
+    assert f"{shown} kW（{label}）" in answer
     assert "比热 2.5 kJ/(kg·K)" in answer
     assert f"温差 {delta} K" in answer
     assert "46.44" not in answer and "4.18" not in answer
@@ -130,11 +133,59 @@ def test_mixed_heat_answer_includes_both_calculations_and_successful_reference_c
     assert "混合后总流量：500 kg/h" in answer
     assert "目标组分质量流量：5 kg/h" in answer
     assert "目标组分质量分数：0.01（1%）" in answer
-    assert "23.2222222222 kW" in answer
+    assert "23.22 kW" in answer
+    assert "质量流量 0.1389 kg/s" in answer
     assert "0.1389 ×" not in answer
     for condition in ("稳态", "完全混合", "无反应", "无泄漏", "无积累", "同一守恒组分"):
         assert condition in answer
     assert execution.trace.data["calls"][-1]["input_refs"][0]["ref"] == "s2.value"
+    assert execution.trace.data["calls"][-1]["arguments"]["mass_flow_kg_s"] == 500 / 3600
+    assert execution.trace.data["calls"][-1]["output"]["heat_duty_kw"] == 500 / 3600 * 4.18 * 40
+
+
+@pytest.mark.parametrize(
+    ("value", "unit", "expected"),
+    [
+        (23.22222222222, "kW", "23.22"),
+        (46.44444444444, "kWh", "46.44"),
+        (500 / 3600, "kg/s", "0.1389"),
+        (2.675, "kW", "2.68"),
+        (-2.675, "kW", "-2.68"),
+        (-0.0, "kW", "0"),
+        (0.005, "kW", "0.01"),
+        (0.0049, "kW", "4.9e-03"),
+        (123.456789123, "kg/h", "123.4568"),
+        (1.234567891e-12, "kW", "1.234568e-12"),
+        (-1.234567891e-12, "kg/s", "-1.234568e-12"),
+        (1.234567891e20, "kWh", "1.234568e+20"),
+    ],
+)
+def test_numeric_display_rounding_by_unit_keeps_small_nonzero_values(value, unit, expected):
+    assert format_number(value, unit) == expected
+    assert value == 0 or float(expected) != 0
+
+
+def test_heating_energy_display_does_not_mutate_raw_outputs():
+    output = calc_heating_energy(500 / 3600 * 4.18 * 40, 2)
+    calls = [{"tool_name": "calc_heating_energy", "status": "succeeded", "output": output}]
+    original = deepcopy(calls)
+    answer = calculation_answer(calls)
+    assert "传热量：46.44 kWh" in answer
+    assert "热功率 23.22 kW" in answer
+    assert calls == original
+    assert output["energy_kwh"] == pytest.approx(46.44444444444444)
+
+
+def test_tiny_heat_display_and_cited_decimal_text_remain_nonzero_and_verbatim(execution):
+    heat(execution, flow=3.6e-9, capacity=1, delta=1)
+    quote = "教学示例热负荷为 46.44444444444444 kW。"
+    execution.trace.data["evidence"] = [{"chunk_id": "quote", "text": quote}]
+    calls = deepcopy(execution.trace.data["calls"])
+    answer = execution.complete("已计算。", "completed", ["quote"], quote)
+    assert "热负荷：1e-12 kW" in answer
+    assert "质量流量 1e-12 kg/s" in answer
+    assert quote in answer
+    assert execution.trace.data["calls"] == calls
 
 
 def test_unit_answer_preserves_offset_temperature_conversion_without_model_fabrication(execution):
@@ -199,7 +250,7 @@ def test_numeric_model_explanation_is_rejected_before_finish_and_can_be_correcte
     answer = execution.complete(
         "计算完成。", "completed", [], "比热越大，相同流量和温差下所需热负荷越大。"
     )
-    assert "46.4444444444 kW" in answer and "补充说明" in answer
+    assert "46.44 kW" in answer and "补充说明" in answer
 
 
 def test_numeric_source_quote_is_preserved_and_distinguished_from_current_result(execution):
@@ -209,7 +260,7 @@ def test_numeric_source_quote_is_preserved_and_distinguished_from_current_result
         {"chunk_id": "temperature", "text": "前文。" + quote + "后文。"}
     ]
     answer = execution.complete("热负荷完成。", "completed", ["temperature"], quote)
-    assert "92.8888888889 kW" in answer
+    assert "92.89 kW" in answer
     assert "来源原文（temperature；非本轮计算结果）" in answer
     assert quote in answer
 
@@ -237,7 +288,7 @@ def test_years_chapters_and_dates_are_kept_in_qualitative_explanation(execution)
 def test_final_tool_remains_compatible_with_optional_empty_explanation(execution, explanation):
     heat(execution)
     answer = FinalTool(execution).forward("已计算。", "completed", [], explanation)
-    assert "46.4444444444 kW" in answer
+    assert "46.44 kW" in answer
     assert "model_explanation" not in execution.trace.data
 
 

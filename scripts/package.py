@@ -1,6 +1,7 @@
 """Create a source delivery archive from an explicit allowlist."""
 
 import hashlib
+import os
 import zipfile
 from pathlib import Path
 
@@ -13,7 +14,6 @@ FILES = {
     ".env.example",
     ".gitignore",
     ".gitattributes",
-    "CHANGELOG.md",
     "app.py",
     "cli.py",
     "start.sh",
@@ -22,7 +22,9 @@ FILES = {
     "Dockerfile",
     "compose.yaml",
     ".dockerignore",
-    "化工知识增强与工具调用_代码交付初步方案.md",
+}
+DELIVERY_DOCS = {
+    "docs/面向化工领域专业知识的大模型知识增强与工具调用算法研究报告.docx",
 }
 DIRECTORIES = {"src", "data", "examples", "tests", "scripts", "docs"}
 EXCLUDED_PARTS = {
@@ -54,7 +56,17 @@ def main():
         for name in DIRECTORIES:
             directory = ROOT / name
             if not directory.is_symlink():
-                candidates.extend(directory.rglob("*"))
+                for current, directories, files in os.walk(directory, followlinks=False):
+                    # Prune before descent: installed dependencies and private caches
+                    # must not be traversed just to discard their files afterward.
+                    directories[:] = [
+                        child
+                        for child in directories
+                        if child not in EXCLUDED_PARTS
+                        and not child.startswith(".env.")
+                        and not (Path(current) / child).is_symlink()
+                    ]
+                    candidates.extend(Path(current) / filename for filename in files)
         for path in sorted(candidates):
             relative = path.relative_to(ROOT)
             if (
@@ -71,6 +83,11 @@ def main():
             ):
                 continue
             if path.suffix in {".pyc", ".tmp"}:
+                continue
+            if relative.parts[0] == "docs" and (
+                relative.as_posix() not in DELIVERY_DOCS
+                and not relative.as_posix().startswith("docs/validation/continuous/")
+            ):
                 continue
             archive.write(path, str(Path(ROOT.name) / relative))
             included.append(str(relative))

@@ -8,6 +8,7 @@ import {
   Search,
   MessageSquare,
   CircleHelp,
+  Network,
 } from '@lucide/vue'
 import type { ConversationSummary } from '../types/api'
 import { timeText, statusLabels } from '../utils/presentation'
@@ -21,7 +22,7 @@ const props = defineProps<{
   version?: string
 }>()
 defineEmits<{
-  navigate: [view: 'workbench' | 'knowledge']
+  navigate: [view: 'workbench' | 'knowledge' | 'graph']
   new: []
   select: [id: string]
   settings: []
@@ -64,6 +65,14 @@ const filtered = computed(() =>
       >
         <BookOpen :size="17" />
         知识资料库
+      </button>
+      <button
+        :class="{ active: view === 'graph' }"
+        :aria-current="view === 'graph' ? 'page' : undefined"
+        @click="$emit('navigate', 'graph')"
+      >
+        <Network :size="17" />
+        知识图谱探索
       </button>
     </nav>
     <div class="sidebar-history">

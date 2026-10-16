@@ -106,7 +106,7 @@ def test_api_agent_tool_retrieval_and_export_smoke(tmp_path, monkeypatch):
         assert result["evidence"] and result["citations"]
         assert result["latency_ms"] >= 0
         report = client.get(f"/api/jobs/{job_id}/report.md")
-        assert report.status_code == 200 and "46.4444444444" in report.text
+        assert report.status_code == 200 and "` 46.44 `" in report.text
         trace = client.get(f"/api/jobs/{job_id}/trace.json").json()
         assert trace["mode"] == "offline_smoke"
         assert trace["citations"] == result["citations"]

@@ -365,12 +365,12 @@ def test_agent_validates_user_capacity_before_calculating(settings, question, hi
     if status == "needs_input":
         assert heat["status"] == "failed" and "output" not in heat
         assert "不能使用教学算例" in heat["error"]
-        assert "46.444" not in result["answer"]
+        assert "46.44" not in result["answer"]
     else:
         assert heat["status"] == "succeeded"
         assert heat["input_provenance"][0]["source"] == "user"
         assert heat["input_provenance"][0]["value"] == pytest.approx(4.18)
-        assert "46.4444444444 kW" in result["answer"]
+        assert "46.44 kW" in result["answer"]
 
 
 def test_model_can_submit_plan_and_multiple_independent_tools_in_one_batch(settings):
