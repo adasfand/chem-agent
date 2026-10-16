@@ -93,7 +93,7 @@ npm run format:check
 
 在项目根目录运行 `uv run python scripts/package.py` 生成 `dist/Chemical.zip` 与SHA256校验文件。源码包包含代码、依赖清单、知识资料、统一示例、测试、运行说明和研究报告。密钥、本机依赖、模型缓存及原始私有运行记录保存在使用方本机。
 
-研究报告：[面向化工领域专业知识的大模型知识增强与工具调用算法研究报告](docs/面向化工领域专业知识的大模型知识增强与工具调用算法研究报告.docx)。实际界面截图位于 `docs/validation/continuous/`。
+研究报告随项目交付材料提供，在本地保留，不纳入源码仓库。实际界面截图位于 `docs/validation/continuous/`，统一保存为PNG格式。
 
 ```text
 src/chem_agent/        模型集成、执行器、计算、检索、API与报告导出
@@ -102,5 +102,5 @@ data/knowledge/      专业知识资料
 examples/tasks.json   统一综合演示题目
 tests/                自动化验证
 scripts/              演示、验证与交付打包
-docs/                 研究报告与实际界面截图
+docs/                 实际界面截图与演示记录
 ```

@@ -14,3 +14,9 @@ runs/
 build/
 dist/
 .local/
+/docs/*.docx
+/docs/*.pdf
+/docs/validation/continuous/*.jpg
+~$*
+*.tmp
+*.bak
